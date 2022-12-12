@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <vector>
 #include <GLFW/glfw3.h>
 
 class Window {
@@ -35,17 +36,30 @@ private:
 
     void CreateDevice();
 
+    void CreateSwapchain();
+
+    void CreateSwapchainImageViews();
+
     void DestroyVulkan();
 
     GLFWwindow *m_window = nullptr;
 
     VkInstance m_instance = VK_NULL_HANDLE;
     VkDebugUtilsMessengerEXT m_debugMessenger = VK_NULL_HANDLE;
+
     VkSurfaceKHR m_surface = VK_NULL_HANDLE;
+
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
-    int m_graphicsQueueFamilyIndex = -1;
-    int m_presentQueueFamilyIndex = -1;
+    uint32_t m_graphicsQueueFamilyIndex = 0;
+    uint32_t m_presentQueueFamilyIndex = 0;
+    VkSurfaceFormatKHR m_surfaceFormat{};
+    VkPresentModeKHR m_presentMode{};
     VkDevice m_device = VK_NULL_HANDLE;
     VkQueue m_graphicsQueue = VK_NULL_HANDLE;
     VkQueue m_presentQueue = VK_NULL_HANDLE;
+
+    VkExtent2D m_swapchainExtent{};
+    VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
+    std::vector<VkImage> m_swapchainImages;
+    std::vector<VkImageView> m_swapchainImageViews;
 };

@@ -5,6 +5,7 @@
 #include "Window.h"
 
 #include <set>
+#include <algorithm>
 
 #include "Debug.h"
 
@@ -33,6 +34,8 @@ void Window::InitVulkan() {
     CreateSurface();
     SelectPhysicalDeviceAndGraphicsQueueFamilyIndex();
     CreateDevice();
+    CreateSwapchain();
+    CreateSwapchainImageViews();
 }
 
 static std::vector<const char *> GetEnabledInstanceLayers() {
@@ -171,6 +174,40 @@ static int FindPresentQueueFamilyIndex(VkPhysicalDevice device, VkSurfaceKHR sur
     return -1;
 }
 
+static std::vector<VkSurfaceFormatKHR> GetSurfaceFormats(VkPhysicalDevice device, VkSurfaceKHR surface) {
+    uint32_t numSurfaceFormats;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &numSurfaceFormats, nullptr);
+    std::vector<VkSurfaceFormatKHR> surfaceFormats(numSurfaceFormats);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &numSurfaceFormats, surfaceFormats.data());
+    return surfaceFormats;
+}
+
+static std::vector<VkPresentModeKHR> GetPresentModes(VkPhysicalDevice device, VkSurfaceKHR surface) {
+    uint32_t numPresentModes;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &numPresentModes, nullptr);
+    std::vector<VkPresentModeKHR> presentModes(numPresentModes);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &numPresentModes, presentModes.data());
+    return presentModes;
+}
+
+static VkSurfaceFormatKHR PickSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &surfaceFormats) {
+    for (const VkSurfaceFormatKHR &surfaceFormat: surfaceFormats) {
+        if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            return surfaceFormat;
+        }
+    }
+    return surfaceFormats.front();
+}
+
+static VkPresentModeKHR PickPresentMode(const std::vector<VkPresentModeKHR> &presentModes) {
+    for (const VkPresentModeKHR &presentMode: presentModes) {
+        if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+            return presentMode;
+        }
+    }
+    return VK_PRESENT_MODE_FIFO_KHR;
+}
+
 void Window::SelectPhysicalDeviceAndGraphicsQueueFamilyIndex() {
     std::vector<VkPhysicalDevice> devices = EnumeratePhysicalDevices(m_instance);
     for (const VkPhysicalDevice &device: devices) {
@@ -178,12 +215,24 @@ void Window::SelectPhysicalDeviceAndGraphicsQueueFamilyIndex() {
         vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
         std::vector<VkQueueFamilyProperties> queueFamilies = GetPhysicalDeviceQueueFamilies(device);
+
         int graphicsQueueFamilyIndex = FindGraphicsQueueFamilyIndex(queueFamilies);
         if (graphicsQueueFamilyIndex < 0) {
             continue;
         }
+
         int presentQueueFamilyIndex = FindPresentQueueFamilyIndex(device, m_surface, queueFamilies);
         if (presentQueueFamilyIndex < 0) {
+            continue;
+        }
+
+        std::vector<VkSurfaceFormatKHR> surfaceFormats = GetSurfaceFormats(device, m_surface);
+        if (surfaceFormats.empty()) {
+            continue;
+        }
+
+        std::vector<VkPresentModeKHR> presentModes = GetPresentModes(device, m_surface);
+        if (presentModes.empty()) {
             continue;
         }
 
@@ -196,10 +245,12 @@ void Window::SelectPhysicalDeviceAndGraphicsQueueFamilyIndex() {
         m_physicalDevice = device;
         m_graphicsQueueFamilyIndex = graphicsQueueFamilyIndex;
         m_presentQueueFamilyIndex = presentQueueFamilyIndex;
+        m_surfaceFormat = PickSurfaceFormat(surfaceFormats);
+        m_presentMode = PickPresentMode(presentModes);
         break;
     }
     DebugCheckCritical(
-            m_physicalDevice != VK_NULL_HANDLE && m_graphicsQueueFamilyIndex >= 0,
+            m_physicalDevice != VK_NULL_HANDLE,
             "Failed to find a suitable Vulkan physical device."
     );
 }
@@ -212,9 +263,9 @@ static std::vector<const char *> GetEnabledDeviceExtensions() {
 
 void Window::CreateDevice() {
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<int> queueFamilyIndices = {m_graphicsQueueFamilyIndex, m_presentQueueFamilyIndex};
+    std::set<uint32_t> queueFamilyIndices = {m_graphicsQueueFamilyIndex, m_presentQueueFamilyIndex};
     float queuePriority = 1.0f;
-    for (int queueFamilyIndex: queueFamilyIndices) {
+    for (uint32_t queueFamilyIndex: queueFamilyIndices) {
         VkDeviceQueueCreateInfo queueCreateInfo{};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
@@ -243,7 +294,102 @@ void Window::CreateDevice() {
     vkGetDeviceQueue(m_device, m_presentQueueFamilyIndex, 0, &m_presentQueue);
 }
 
+static VkExtent2D CalcSwapchainExtent(const VkSurfaceCapabilitiesKHR &capabilities, GLFWwindow *window) {
+    if (capabilities.currentExtent.width == std::numeric_limits<uint32_t>::max() &&
+        capabilities.currentExtent.height == std::numeric_limits<uint32_t>::max()) {
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+
+        VkExtent2D extent = {
+                std::clamp(static_cast<uint32_t>(width), capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
+                std::clamp(static_cast<uint32_t>(height), capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
+        };
+        return extent;
+    }
+    return capabilities.currentExtent;
+}
+
+void Window::CreateSwapchain() {
+    VkSurfaceCapabilitiesKHR capabilities;
+    DebugCheckCriticalVk(
+            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &capabilities),
+            "Failed to get Vulkan physical device surface capabilities."
+    );
+    uint32_t imageCount = capabilities.minImageCount + 1;
+    if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount) {
+        imageCount = capabilities.maxImageCount;
+    }
+    m_swapchainExtent = CalcSwapchainExtent(capabilities, m_window);
+
+    VkSwapchainCreateInfoKHR createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    createInfo.surface = m_surface;
+    createInfo.minImageCount = imageCount;
+    createInfo.imageFormat = m_surfaceFormat.format;
+    createInfo.imageColorSpace = m_surfaceFormat.colorSpace;
+    createInfo.imageExtent = m_swapchainExtent;
+    createInfo.imageArrayLayers = 1;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    uint32_t queueFamilyIndices[] = {
+            m_graphicsQueueFamilyIndex,
+            m_presentQueueFamilyIndex
+    };
+    if (m_graphicsQueueFamilyIndex != m_presentQueueFamilyIndex) {
+        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        createInfo.queueFamilyIndexCount = 2;
+        createInfo.pQueueFamilyIndices = queueFamilyIndices;
+    } else {
+        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        createInfo.queueFamilyIndexCount = 0;
+        createInfo.pQueueFamilyIndices = nullptr;
+    }
+    createInfo.preTransform = capabilities.currentTransform;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    createInfo.presentMode = m_presentMode;
+    createInfo.clipped = VK_TRUE;
+    createInfo.oldSwapchain = m_swapchain;
+    DebugCheckCriticalVk(
+            vkCreateSwapchainKHR(m_device, &createInfo, nullptr, &m_swapchain),
+            "Failed to create Vulkan swapchain."
+    );
+
+    vkGetSwapchainImagesKHR(m_device, m_swapchain, &imageCount, nullptr);
+    m_swapchainImages.resize(imageCount);
+    vkGetSwapchainImagesKHR(m_device, m_swapchain, &imageCount, m_swapchainImages.data());
+}
+
+void Window::CreateSwapchainImageViews() {
+    size_t numImages = m_swapchainImages.size();
+    m_swapchainImageViews.resize(numImages);
+    for (int i = 0; i < numImages; i++) {
+        VkImageViewCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        createInfo.image = m_swapchainImages[i];
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.format = m_surfaceFormat.format;
+        VkComponentMapping &components = createInfo.components;
+        components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        VkImageSubresourceRange &subresourceRange = createInfo.subresourceRange;
+        subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        subresourceRange.baseMipLevel = 0;
+        subresourceRange.levelCount = 1;
+        subresourceRange.baseArrayLayer = 0;
+        subresourceRange.layerCount = 1;
+        DebugCheckCriticalVk(
+                vkCreateImageView(m_device, &createInfo, nullptr, &m_swapchainImageViews[i]),
+                "Failed to create Vulkan swapchain image view #{}.", i
+        );
+    }
+}
+
 void Window::DestroyVulkan() {
+    for (auto &swapchainImageView: m_swapchainImageViews) {
+        vkDestroyImageView(m_device, swapchainImageView, nullptr);
+    }
+    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
     vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
     vkDestroyDevice(m_device, nullptr);
     vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
