@@ -34,8 +34,11 @@ void Window::InitVulkan() {
     CreateSurface();
     SelectPhysicalDeviceAndGraphicsQueueFamilyIndex();
     CreateDevice();
+    CreateSyncPrimitives();
+    CreateCommandPool();
+    CreateRenderPass();
     CreateSwapchain();
-    CreateSwapchainImageViews();
+    CreateSwapchainImageViewsAndFramebuffers();
 }
 
 static std::vector<const char *> GetEnabledInstanceLayers() {
@@ -294,6 +297,71 @@ void Window::CreateDevice() {
     vkGetDeviceQueue(m_device, m_presentQueueFamilyIndex, 0, &m_presentQueue);
 }
 
+void Window::CreateSyncPrimitives() {
+    VkFenceCreateInfo fenceCreateInfo{};
+    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    vkCreateFence(m_device, &fenceCreateInfo, nullptr, &m_renderFence);
+
+    VkSemaphoreCreateInfo semaphoreCreateInfo{};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_presentSemaphore);
+    vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_renderSemaphore);
+}
+
+void Window::CreateCommandPool() {
+    VkCommandPoolCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    createInfo.queueFamilyIndex = m_graphicsQueueFamilyIndex;
+    DebugCheckCriticalVk(
+            vkCreateCommandPool(m_device, &createInfo, nullptr, &m_commandPool),
+            "Failed to create Vulkan command pool."
+    );
+
+    VkCommandBufferAllocateInfo allocateInfo{};
+    allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocateInfo.commandPool = m_commandPool;
+    allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocateInfo.commandBufferCount = 1;
+    DebugCheckCriticalVk(
+            vkAllocateCommandBuffers(m_device, &allocateInfo, &m_commandBuffer),
+            "Failed to create Vulkan command buffer."
+    );
+}
+
+void Window::CreateRenderPass() {
+    VkAttachmentDescription colorAttachment{};
+    colorAttachment.format = m_surfaceFormat.format;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference colorAttachmentRef{};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+
+    VkRenderPassCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    createInfo.attachmentCount = 1;
+    createInfo.pAttachments = &colorAttachment;
+    createInfo.subpassCount = 1;
+    createInfo.pSubpasses = &subpass;
+    DebugCheckCriticalVk(
+            vkCreateRenderPass(m_device, &createInfo, nullptr, &m_renderPass),
+            "Failed to create Vulkan render pass."
+    );
+}
+
 static VkExtent2D CalcSwapchainExtent(const VkSurfaceCapabilitiesKHR &capabilities, GLFWwindow *window) {
     if (capabilities.currentExtent.width == std::numeric_limits<uint32_t>::max() &&
         capabilities.currentExtent.height == std::numeric_limits<uint32_t>::max()) {
@@ -358,7 +426,7 @@ void Window::CreateSwapchain() {
     vkGetSwapchainImagesKHR(m_device, m_swapchain, &imageCount, m_swapchainImages.data());
 }
 
-void Window::CreateSwapchainImageViews() {
+void Window::CreateSwapchainImageViewsAndFramebuffers() {
     size_t numImages = m_swapchainImages.size();
     m_swapchainImageViews.resize(numImages);
     for (int i = 0; i < numImages; i++) {
@@ -383,15 +451,43 @@ void Window::CreateSwapchainImageViews() {
                 "Failed to create Vulkan swapchain image view #{}.", i
         );
     }
+    m_framebuffers.resize(numImages);
+    for (int i = 0; i < numImages; i++) {
+        VkFramebufferCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        createInfo.renderPass = m_renderPass;
+        createInfo.attachmentCount = 1;
+        createInfo.pAttachments = &m_swapchainImageViews[i];
+        createInfo.width = m_swapchainExtent.width;
+        createInfo.height = m_swapchainExtent.height;
+        createInfo.layers = 1;
+        DebugCheckCriticalVk(
+                vkCreateFramebuffer(m_device, &createInfo, nullptr, &m_framebuffers[i]),
+                "Failed to create Vulkan framebuffer #{}.", i
+        );
+    }
 }
 
 void Window::DestroyVulkan() {
+    DebugCheckCriticalVk(
+            vkDeviceWaitIdle(m_device),
+            "Failed to wait for Vulkan device when trying to cleanup."
+    );
+
+    for (auto &framebuffer: m_framebuffers) {
+        vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+    }
     for (auto &swapchainImageView: m_swapchainImageViews) {
         vkDestroyImageView(m_device, swapchainImageView, nullptr);
     }
     vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
-    vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
+    vkDestroyRenderPass(m_device, m_renderPass, nullptr);
+    vkDestroyCommandPool(m_device, m_commandPool, nullptr);
+    vkDestroySemaphore(m_device, m_presentSemaphore, nullptr);
+    vkDestroySemaphore(m_device, m_renderSemaphore, nullptr);
+    vkDestroyFence(m_device, m_renderFence, nullptr);
     vkDestroyDevice(m_device, nullptr);
+    vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
     vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
     vkDestroyInstance(m_instance, nullptr);
 }
@@ -399,5 +495,92 @@ void Window::DestroyVulkan() {
 void Window::MainLoop() {
     while (!glfwWindowShouldClose(m_window)) {
         glfwPollEvents();
+        Frame();
     }
+}
+
+void Window::Frame() {
+    uint32_t swapchainImageIndex = WaitForFrame();
+
+    DebugCheckCriticalVk(
+            vkResetCommandBuffer(m_commandBuffer, 0),
+            "Failed to reset Vulkan command buffer."
+    );
+
+    VkCommandBufferBeginInfo commandBufferBeginInfo{};
+    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    DebugCheckCriticalVk(
+            vkBeginCommandBuffer(m_commandBuffer, &commandBufferBeginInfo),
+            "Failed to begin Vulkan command buffer."
+    );
+
+    VkClearValue clearValue{};
+    clearValue.color.float32[0] = 0.4f;
+    clearValue.color.float32[1] = 0.8f;
+    clearValue.color.float32[2] = 1.0f;
+    clearValue.color.float32[3] = 1.0f;
+    VkRenderPassBeginInfo renderPassBeginInfo{};
+    renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassBeginInfo.renderPass = m_renderPass;
+    renderPassBeginInfo.framebuffer = m_framebuffers[swapchainImageIndex];
+    renderPassBeginInfo.renderArea = {{0, 0}, m_swapchainExtent};
+    renderPassBeginInfo.clearValueCount = 1;
+    renderPassBeginInfo.pClearValues = &clearValue;
+    vkCmdBeginRenderPass(m_commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    vkCmdEndRenderPass(m_commandBuffer);
+
+    DebugCheckCriticalVk(
+            vkEndCommandBuffer(m_commandBuffer),
+            "Failed to end Vulkan command buffer."
+    );
+
+    SubmitAndPresent(swapchainImageIndex);
+}
+
+uint32_t Window::WaitForFrame() {
+    DebugCheckCriticalVk(
+            vkWaitForFences(m_device, 1, &m_renderFence, true, 1'000'000'000),
+            "Failed to wait for Vulkan render fence."
+    );
+    DebugCheckCriticalVk(
+            vkResetFences(m_device, 1, &m_renderFence),
+            "Failed to reset Vulkan render fence."
+    );
+    uint32_t swapchainImageIndex;
+    DebugCheckCriticalVk(
+            vkAcquireNextImageKHR(m_device, m_swapchain, 1'000'000'000, m_presentSemaphore, nullptr, &swapchainImageIndex),
+            "Failed to acquire next Vulkan swapchain image."
+    );
+    return swapchainImageIndex;
+}
+
+void Window::SubmitAndPresent(uint32_t swapchainImageIndex) {
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &m_presentSemaphore;
+    VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    submitInfo.pWaitDstStageMask = &waitStage;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &m_commandBuffer;
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &m_renderSemaphore;
+    DebugCheckCriticalVk(
+            vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_renderFence),
+            "Failed to submit Vulkan command buffer."
+    );
+
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &m_renderSemaphore;
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &m_swapchain;
+    presentInfo.pImageIndices = &swapchainImageIndex;
+    DebugCheckCriticalVk(
+            vkQueuePresentKHR(m_graphicsQueue, &presentInfo),
+            "Failed to present Vulkan swapchain image."
+    );
 }

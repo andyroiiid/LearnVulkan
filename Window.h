@@ -36,11 +36,23 @@ private:
 
     void CreateDevice();
 
+    void CreateSyncPrimitives();
+
+    void CreateCommandPool();
+
+    void CreateRenderPass();
+
     void CreateSwapchain();
 
-    void CreateSwapchainImageViews();
+    void CreateSwapchainImageViewsAndFramebuffers();
 
     void DestroyVulkan();
+
+    void Frame();
+
+    uint32_t WaitForFrame();
+
+    void SubmitAndPresent(uint32_t swapchainImageIndex);
 
     GLFWwindow *m_window = nullptr;
 
@@ -58,8 +70,18 @@ private:
     VkQueue m_graphicsQueue = VK_NULL_HANDLE;
     VkQueue m_presentQueue = VK_NULL_HANDLE;
 
+    VkFence m_renderFence = VK_NULL_HANDLE;
+    VkSemaphore m_presentSemaphore = VK_NULL_HANDLE;
+    VkSemaphore m_renderSemaphore = VK_NULL_HANDLE;
+
+    VkCommandPool m_commandPool = VK_NULL_HANDLE;
+    VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
+
+    VkRenderPass m_renderPass = VK_NULL_HANDLE;
+
     VkExtent2D m_swapchainExtent{};
     VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
     std::vector<VkImage> m_swapchainImages;
     std::vector<VkImageView> m_swapchainImageViews;
+    std::vector<VkFramebuffer> m_framebuffers;
 };
