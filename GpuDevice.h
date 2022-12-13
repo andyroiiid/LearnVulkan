@@ -6,6 +6,12 @@
 
 #include <vector>
 #include <GLFW/glfw3.h>
+#include <vk_mem_alloc.h>
+
+struct GpuBuffer {
+    VkBuffer Buffer = VK_NULL_HANDLE;
+    VmaAllocation Allocation = VK_NULL_HANDLE;
+};
 
 class GpuDevice {
 public:
@@ -43,6 +49,8 @@ public:
 
     VkPipeline CreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo &createInfo);
 
+    GpuBuffer CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo);
+
     void DestroyCommandPool(VkCommandPool commandPool) { vkDestroyCommandPool(m_device, commandPool, nullptr); }
 
     void DestroyRenderPass(VkRenderPass renderPass) { vkDestroyRenderPass(m_device, renderPass, nullptr); }
@@ -55,11 +63,17 @@ public:
 
     void DestroyPipeline(VkPipeline pipeline) { vkDestroyPipeline(m_device, pipeline, nullptr); }
 
+    void DestroyBuffer(GpuBuffer buffer) { vmaDestroyBuffer(m_allocator, buffer.Buffer, buffer.Allocation); }
+
     VkResult WaitIdle() { return vkDeviceWaitIdle(m_device); }
 
     uint32_t WaitForFrame();
 
     void SubmitAndPresent(uint32_t swapchainImageIndex, VkCommandBuffer commandBuffer);
+
+    void *MapMemory(VmaAllocation allocation);
+
+    void UnmapMemory(VmaAllocation allocation);
 
 private:
     void CreateInstance();
@@ -71,6 +85,8 @@ private:
     void SelectPhysicalDeviceAndQueueFamilyIndices();
 
     void CreateDevice();
+
+    void CreateAllocator();
 
     void CreateSyncPrimitives();
 
@@ -102,4 +118,6 @@ private:
     VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
     std::vector<VkImage> m_swapchainImages;
     std::vector<VkImageView> m_swapchainImageViews;
+
+    VmaAllocator m_allocator = VK_NULL_HANDLE;
 };

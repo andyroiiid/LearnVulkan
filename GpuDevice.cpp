@@ -16,6 +16,7 @@ GpuDevice::GpuDevice(GLFWwindow *window) {
     CreateSurface();
     SelectPhysicalDeviceAndQueueFamilyIndices();
     CreateDevice();
+    CreateAllocator();
     CreateSyncPrimitives();
     CreateSwapchain();
     CreateSwapchainImageViews();
@@ -285,6 +286,18 @@ void GpuDevice::CreateDevice() {
     vkGetDeviceQueue(m_device, m_presentQueueFamilyIndex, 0, &m_presentQueue);
 }
 
+void GpuDevice::CreateAllocator() {
+    VmaAllocatorCreateInfo createInfo{};
+    createInfo.physicalDevice = m_physicalDevice;
+    createInfo.device = m_device;
+    createInfo.instance = m_instance;
+    createInfo.vulkanApiVersion = VK_API_VERSION_1_3;
+    DebugCheckCriticalVk(
+            vmaCreateAllocator(&createInfo, &m_allocator),
+            "Failed to create Vulkan Memory Allocator."
+    );
+}
+
 void GpuDevice::CreateSyncPrimitives() {
     VkFenceCreateInfo fenceCreateInfo{};
     fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -401,6 +414,7 @@ GpuDevice::~GpuDevice() {
     vkDestroySemaphore(m_device, m_presentSemaphore, nullptr);
     vkDestroySemaphore(m_device, m_renderSemaphore, nullptr);
     vkDestroyFence(m_device, m_renderFence, nullptr);
+    vmaDestroyAllocator(m_allocator);
     vkDestroyDevice(m_device, nullptr);
     vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
     vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
@@ -470,6 +484,15 @@ VkPipeline GpuDevice::CreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo 
     return pipeline;
 }
 
+GpuBuffer GpuDevice::CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo) {
+    GpuBuffer buffer;
+    DebugCheckCriticalVk(
+            vmaCreateBuffer(m_allocator, &bufferCreateInfo, &allocationCreateInfo, &buffer.Buffer, &buffer.Allocation, nullptr),
+            "Failed to create Vulkan buffer."
+    );
+    return buffer;
+}
+
 uint32_t GpuDevice::WaitForFrame() {
     DebugCheckCriticalVk(
             vkWaitForFences(m_device, 1, &m_renderFence, true, 1'000'000'000),
@@ -514,4 +537,17 @@ void GpuDevice::SubmitAndPresent(uint32_t swapchainImageIndex, VkCommandBuffer c
             vkQueuePresentKHR(m_graphicsQueue, &presentInfo),
             "Failed to present Vulkan swapchain image."
     );
+}
+
+void *GpuDevice::MapMemory(VmaAllocation allocation) {
+    void *data = nullptr;
+    DebugCheckCriticalVk(
+            vmaMapMemory(m_allocator, allocation, &data),
+            "Failed to map Vulkan memory."
+    );
+    return data;
+}
+
+void GpuDevice::UnmapMemory(VmaAllocation allocation) {
+    vmaUnmapMemory(m_allocator, allocation);
 }

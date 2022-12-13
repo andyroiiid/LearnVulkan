@@ -17,6 +17,8 @@ find_package(Vulkan REQUIRED)
 
 add_subdirectory(glslang EXCLUDE_FROM_ALL)
 
+add_subdirectory(VulkanMemoryAllocator EXCLUDE_FROM_ALL)
+
 add_subdirectory(glm EXCLUDE_FROM_ALL)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -25,10 +27,12 @@ add_executable(LearnVulkan
         main.cpp
         Debug.h
         Window.cpp Window.h
+        vk_mem_alloc.cpp
         GpuDevice.cpp GpuDevice.h
-        Renderer.cpp Renderer.h
-        ShaderCompiler.cpp ShaderCompiler.h)
+        ShaderCompiler.cpp ShaderCompiler.h
+        VertexBase.cpp VertexBase.h
+        Renderer.cpp Renderer.h)
 
 target_compile_definitions(LearnVulkan PUBLIC GLFW_INCLUDE_VULKAN)
 
-target_link_libraries(LearnVulkan PUBLIC spdlog glfw Vulkan::Vulkan glslang SPIRV glslang-default-resource-limits glm)
+target_link_libraries(LearnVulkan PUBLIC spdlog glfw Vulkan::Vulkan glslang SPIRV glslang-default-resource-limits VulkanMemoryAllocator glm)

@@ -35,6 +35,8 @@ private:
 
     void CreatePipeline();
 
+    void CreateVertexBuffer();
+
     GpuDevice *m_device = nullptr;
 
     VkCommandPool m_commandPool = VK_NULL_HANDLE;
@@ -49,4 +51,6 @@ private:
     VkShaderModule m_fragmentShader = VK_NULL_HANDLE;
 
     VkPipeline m_pipeline = VK_NULL_HANDLE;
+
+    GpuBuffer m_vertexBuffer;
 };

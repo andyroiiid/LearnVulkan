@@ -5,7 +5,7 @@
 #pragma once
 
 #include <spdlog/spdlog.h>
-#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan.h>
 
 template<typename... Args>
 void DebugVerbose(const spdlog::format_string_t<Args...> &format, Args... args) {

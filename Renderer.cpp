@@ -6,6 +6,7 @@
 
 #include "Debug.h"
 #include "ShaderCompiler.h"
+#include "VertexBase.h"
 
 Renderer::Renderer(GpuDevice *device) {
     m_device = device;
@@ -15,6 +16,7 @@ Renderer::Renderer(GpuDevice *device) {
     CreatePipelineLayout();
     CreateShaders();
     CreatePipeline();
+    CreateVertexBuffer();
 }
 
 void Renderer::CreateCommandBuffer() {
@@ -95,22 +97,16 @@ void Renderer::CreateShaders() {
     const char *vertexSource = R"GLSL(
 #version 450 core
 
+layout (location = 0) in vec3 aPosition;
+layout (location = 1) in vec3 aNormal;
+layout (location = 2) in vec3 aColor;
+
 layout (location = 0) out vec4 vColor;
 
 void main()
 {
-    const vec3 POSITIONS[3] = vec3[3](
-        vec3(-1, 1, 0),
-        vec3(1, 1, 0),
-        vec3(0, -1, 0)
-    );
-    const vec3 COLORS[3] = vec3[3](
-        vec3(1, 0, 0),
-        vec3(0, 1, 0),
-        vec3(0, 0, 1)
-    );
-    gl_Position = vec4(POSITIONS[gl_VertexIndex], 1);
-    vColor = vec4(COLORS[gl_VertexIndex], 1);
+    gl_Position = vec4(aPosition, 1);
+    vColor = vec4(aColor, 1);
 }
 )GLSL";
     const char *fragmentSource = R"GLSL(
@@ -167,12 +163,7 @@ void Renderer::CreatePipeline() {
         stages.push_back(createInfo);
     }
 
-    VkPipelineVertexInputStateCreateInfo vertexInputState{};
-    vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputState.vertexBindingDescriptionCount = 0;
-    vertexInputState.pVertexBindingDescriptions = nullptr;
-    vertexInputState.vertexAttributeDescriptionCount = 0;
-    vertexInputState.pVertexAttributeDescriptions = nullptr;
+    VkPipelineVertexInputStateCreateInfo vertexInputState = VertexBase::GetPipelineVertexInputStateCreateInfo();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyState{};
     inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -240,12 +231,35 @@ void Renderer::CreatePipeline() {
     m_pipeline = m_device->CreateGraphicsPipeline(createInfo);
 }
 
+void Renderer::CreateVertexBuffer() {
+    std::vector<VertexBase> vertices{
+            {{-1.0f, 1.0f,  0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
+            {{1.0f,  1.0f,  0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
+            {{0.0f,  -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}}
+    };
+
+    VkBufferCreateInfo bufferCreateInfo{};
+    bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferCreateInfo.size = vertices.size() * sizeof(VertexBase);
+    bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+
+    VmaAllocationCreateInfo allocationCreateInfo{};
+    allocationCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+    m_vertexBuffer = m_device->CreateBuffer(bufferCreateInfo, allocationCreateInfo);
+
+    auto data = static_cast<VertexBase *>(m_device->MapMemory(m_vertexBuffer.Allocation));
+    memcpy(data, vertices.data(), vertices.size() * sizeof(VertexBase));
+    m_device->UnmapMemory(m_vertexBuffer.Allocation);
+}
+
 Renderer::~Renderer() {
     DebugCheckCriticalVk(
             m_device->WaitIdle(),
             "Failed to wait for Vulkan device when trying to cleanup renderer."
     );
 
+    m_device->DestroyBuffer(m_vertexBuffer);
     m_device->DestroyPipeline(m_pipeline);
     m_device->DestroyShaderModule(m_vertexShader);
     m_device->DestroyShaderModule(m_fragmentShader);
@@ -288,6 +302,8 @@ void Renderer::Draw() {
     vkCmdBeginRenderPass(m_commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &m_vertexBuffer.Buffer, &offset);
     vkCmdDraw(m_commandBuffer, 3, 1, 0, 0);
 
     vkCmdEndRenderPass(m_commandBuffer);
