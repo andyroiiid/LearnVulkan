@@ -493,6 +493,18 @@ GpuBuffer GpuDevice::CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, co
     return buffer;
 }
 
+GpuBuffer GpuDevice::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags bufferUsage, VmaMemoryUsage memoryUsage) {
+    VkBufferCreateInfo bufferCreateInfo{};
+    bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferCreateInfo.size = size;
+    bufferCreateInfo.usage = bufferUsage;
+
+    VmaAllocationCreateInfo allocationCreateInfo{};
+    allocationCreateInfo.usage = memoryUsage;
+
+    return CreateBuffer(bufferCreateInfo, allocationCreateInfo);
+}
+
 uint32_t GpuDevice::WaitForFrame() {
     DebugCheckCriticalVk(
             vkWaitForFences(m_device, 1, &m_renderFence, true, 1'000'000'000),

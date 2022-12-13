@@ -10,8 +10,9 @@
 #include "Debug.h"
 #include "ShaderCompiler.h"
 #include "VertexBase.h"
+#include "MeshUtilities.h"
 
-struct PushConstant {
+struct PushConstantData {
     glm::mat4 Matrix;
 };
 
@@ -92,7 +93,7 @@ void Renderer::CreatePipelineLayout() {
     VkPushConstantRange pushConstantRange;
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(PushConstant);
+    pushConstantRange.size = sizeof(PushConstantData);
 
     VkPipelineLayoutCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -111,7 +112,7 @@ void Renderer::CreateShaders() {
 
 layout (location = 0) in vec3 aPosition;
 layout (location = 1) in vec3 aNormal;
-layout (location = 2) in vec3 aColor;
+layout (location = 2) in vec2 aTexCoord;
 
 layout (location = 0) out vec4 vColor;
 
@@ -123,7 +124,7 @@ layout (push_constant) uniform PushConstant
 void main()
 {
     gl_Position = uMatrix * vec4(aPosition, 1);
-    vColor = vec4(aColor, 1);
+    vColor = vec4(aTexCoord, 0, 1);
 }
 )GLSL";
     const char *fragmentSource = R"GLSL(
@@ -250,21 +251,14 @@ void Renderer::CreatePipeline() {
 }
 
 void Renderer::CreateVertexBuffer() {
-    std::vector<VertexBase> vertices{
-            {{-1.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
-            {{1.0f,  -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
-            {{0.0f,  1.0f,  0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}}
-    };
+    std::vector<VertexBase> vertices;
+    AppendBoxVertices(vertices, {-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f});
 
-    VkBufferCreateInfo bufferCreateInfo{};
-    bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferCreateInfo.size = vertices.size() * sizeof(VertexBase);
-    bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-
-    VmaAllocationCreateInfo allocationCreateInfo{};
-    allocationCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-
-    m_vertexBuffer = m_device->CreateBuffer(bufferCreateInfo, allocationCreateInfo);
+    m_vertexBuffer = m_device->CreateBuffer(
+            vertices.size() * sizeof(VertexBase),
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            VMA_MEMORY_USAGE_CPU_TO_GPU
+    );
 
     auto data = static_cast<VertexBase *>(m_device->MapMemory(m_vertexBuffer.Allocation));
     memcpy(data, vertices.data(), vertices.size() * sizeof(VertexBase));
@@ -328,18 +322,18 @@ void Renderer::Draw() {
             100.0f
     );
     const glm::mat4 view = glm::lookAt(
-            glm::vec3(1.0f, 2.0f, -3.0f),
+            glm::vec3(3.0f, 4.0f, -5.0f),
             glm::vec3(0.0f, 0.0f, 0.0f),
             glm::vec3(0.0f, 1.0f, 0.0f)
     );
     const glm::mat4 model = glm::mat4(1.0f);
-    const PushConstant pushConstant{
+    const PushConstantData pushConstant{
             projection * view * model
     };
-    vkCmdPushConstants(m_commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pushConstant);
+    vkCmdPushConstants(m_commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pushConstant);
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &m_vertexBuffer.Buffer, &offset);
-    vkCmdDraw(m_commandBuffer, 3, 1, 0, 0);
+    vkCmdDraw(m_commandBuffer, 36, 1, 0, 0);
 
     vkCmdEndRenderPass(m_commandBuffer);
 

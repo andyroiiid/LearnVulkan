@@ -28,7 +28,7 @@ VkPipelineVertexInputStateCreateInfo VertexBase::GetPipelineVertexInputStateCrea
     static const std::vector<VkVertexInputAttributeDescription> attributes{
             {0, 0, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(VertexBase, Position))},
             {1, 0, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(VertexBase, Normal))},
-            {2, 0, VK_FORMAT_R32G32B32_SFLOAT, static_cast<uint32_t>(offsetof(VertexBase, Color))}
+            {2, 0, VK_FORMAT_R32G32_SFLOAT,    static_cast<uint32_t>(offsetof(VertexBase, TexCoord))}
     };
 
     return CreatePipelineVertexInputStateCreateInfo(bindings, attributes);

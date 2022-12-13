@@ -31,6 +31,7 @@ add_executable(LearnVulkan
         GpuDevice.cpp GpuDevice.h
         ShaderCompiler.cpp ShaderCompiler.h
         VertexBase.cpp VertexBase.h
+        MeshUtilities.cpp MeshUtilities.h
         Renderer.cpp Renderer.h)
 
 target_compile_definitions(LearnVulkan PUBLIC GLFW_INCLUDE_VULKAN GLM_FORCE_LEFT_HANDED GLM_FORCE_DEPTH_ZERO_TO_ONE)
