@@ -33,6 +33,6 @@ add_executable(LearnVulkan
         VertexBase.cpp VertexBase.h
         Renderer.cpp Renderer.h)
 
-target_compile_definitions(LearnVulkan PUBLIC GLFW_INCLUDE_VULKAN)
+target_compile_definitions(LearnVulkan PUBLIC GLFW_INCLUDE_VULKAN GLM_FORCE_LEFT_HANDED GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 target_link_libraries(LearnVulkan PUBLIC spdlog glfw Vulkan::Vulkan glslang SPIRV glslang-default-resource-limits VulkanMemoryAllocator glm)

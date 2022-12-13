@@ -4,9 +4,16 @@
 
 #include "Renderer.h"
 
+#include <glm/mat4x4.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "Debug.h"
 #include "ShaderCompiler.h"
 #include "VertexBase.h"
+
+struct PushConstant {
+    glm::mat4 Matrix;
+};
 
 Renderer::Renderer(GpuDevice *device) {
     m_device = device;
@@ -82,12 +89,17 @@ void Renderer::CreateFramebuffers() {
 }
 
 void Renderer::CreatePipelineLayout() {
+    VkPushConstantRange pushConstantRange;
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(PushConstant);
+
     VkPipelineLayoutCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     createInfo.setLayoutCount = 0;
     createInfo.pSetLayouts = nullptr;
-    createInfo.pushConstantRangeCount = 0;
-    createInfo.pPushConstantRanges = nullptr;
+    createInfo.pushConstantRangeCount = 1;
+    createInfo.pPushConstantRanges = &pushConstantRange;
     m_pipelineLayout = m_device->CreatePipelineLayout(createInfo);
 }
 
@@ -103,9 +115,14 @@ layout (location = 2) in vec3 aColor;
 
 layout (location = 0) out vec4 vColor;
 
+layout (push_constant) uniform PushConstant
+{
+    mat4 uMatrix;
+};
+
 void main()
 {
-    gl_Position = vec4(aPosition, 1);
+    gl_Position = uMatrix * vec4(aPosition, 1);
     vColor = vec4(aColor, 1);
 }
 )GLSL";
@@ -171,9 +188,10 @@ void Renderer::CreatePipeline() {
     inputAssemblyState.primitiveRestartEnable = VK_FALSE;
 
     const VkExtent2D &size = m_device->GetSwapchainExtent();
+    // flipped upside down so that it's consistent with OpenGL
     const VkViewport viewport{
-            0.0f, 0.0f,
-            static_cast<float>(size.width), static_cast<float>(size.height),
+            0.0f, static_cast<float>(size.height),
+            static_cast<float>(size.width), -static_cast<float>(size.height),
             0.0f, 1.0f
     };
     const VkRect2D scissor{
@@ -233,9 +251,9 @@ void Renderer::CreatePipeline() {
 
 void Renderer::CreateVertexBuffer() {
     std::vector<VertexBase> vertices{
-            {{-1.0f, 1.0f,  0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
-            {{1.0f,  1.0f,  0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
-            {{0.0f,  -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}}
+            {{-1.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
+            {{1.0f,  -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
+            {{0.0f,  1.0f,  0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}}
     };
 
     VkBufferCreateInfo bufferCreateInfo{};
@@ -302,6 +320,23 @@ void Renderer::Draw() {
     vkCmdBeginRenderPass(m_commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    const VkExtent2D &swapchainExtent = m_device->GetSwapchainExtent();
+    const glm::mat4 projection = glm::perspective(
+            glm::radians(60.0f),
+            static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height),
+            0.1f,
+            100.0f
+    );
+    const glm::mat4 view = glm::lookAt(
+            glm::vec3(1.0f, 2.0f, -3.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f)
+    );
+    const glm::mat4 model = glm::mat4(1.0f);
+    const PushConstant pushConstant{
+            projection * view * model
+    };
+    vkCmdPushConstants(m_commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &pushConstant);
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &m_vertexBuffer.Buffer, &offset);
     vkCmdDraw(m_commandBuffer, 3, 1, 0, 0);
