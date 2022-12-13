@@ -22,7 +22,7 @@ void ShaderCompiler::SetPreamble(std::string preamble) {
     m_preamble = std::move(preamble);
 }
 
-bool ShaderCompiler::Compile(const EShLanguage stage, const char *source, std::vector<unsigned int> &spirv) {
+bool ShaderCompiler::Compile(const EShLanguage stage, const char *source, std::vector<uint32_t> &spirv) {
     glslang::TShader shader(stage);
     shader.setStrings(&source, 1);
     shader.setPreamble(m_preamble.c_str());

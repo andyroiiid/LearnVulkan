@@ -14,7 +14,7 @@ public:
 
     void SetPreamble(std::string preamble);
 
-    bool Compile(EShLanguage stage, const char *source, std::vector<unsigned int> &spirv);
+    bool Compile(EShLanguage stage, const char *source, std::vector<uint32_t> &spirv);
 
 private:
     std::string m_preamble;

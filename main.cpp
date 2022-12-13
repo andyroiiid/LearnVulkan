@@ -41,8 +41,8 @@ void main()
 }
 )GLSL";
 
-    std::vector<unsigned int> vertexSpirv;
-    std::vector<unsigned int> fragmentSpirv;
+    std::vector<uint32_t> vertexSpirv;
+    std::vector<uint32_t> fragmentSpirv;
 
     DebugCheckCritical(
             shaderCompiler.Compile(EShLangVertex, vertexSource, vertexSpirv),
