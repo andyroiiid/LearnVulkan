@@ -8,14 +8,29 @@
 #include <vulkan/vulkan_core.h>
 
 template<typename... Args>
-void DebugLog(const spdlog::format_string_t<Args...> &format, Args... args) {
+void DebugVerbose(const spdlog::format_string_t<Args...> &format, Args... args) {
+    spdlog::trace(format, args...);
+}
+
+template<typename... Args>
+void DebugInfo(const spdlog::format_string_t<Args...> &format, Args... args) {
     spdlog::info(format, args...);
+}
+
+template<typename... Args>
+void DebugWarning(const spdlog::format_string_t<Args...> &format, Args... args) {
+    spdlog::warn(format, args...);
+}
+
+template<typename... Args>
+void DebugError(const spdlog::format_string_t<Args...> &format, Args... args) {
+    spdlog::error(format, args...);
 }
 
 template<typename... Args>
 bool DebugCheck(const bool succeeded, const spdlog::format_string_t<Args...> &failMessage, Args... args) {
     if (succeeded) return true;
-    DebugLog(failMessage, args...);
+    DebugWarning(failMessage, args...);
     return false;
 }
 
@@ -26,7 +41,8 @@ void DebugCheckVk(const VkResult result, const spdlog::format_string_t<Args...> 
 
 template<typename... Args>
 void DebugCheckCritical(const bool succeeded, const spdlog::format_string_t<Args...> &failMessage, Args... args) {
-    if (DebugCheck(succeeded, failMessage, args...)) return;
+    if (succeeded) return;
+    DebugError(failMessage, args...);
     exit(EXIT_FAILURE);
 }
 

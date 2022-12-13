@@ -16,7 +16,13 @@ find_package(Vulkan REQUIRED)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(LearnVulkan main.cpp Debug.h Window.cpp Window.h)
+add_executable(LearnVulkan
+        main.cpp
+        Debug.h
+        Window.cpp Window.h
+        GpuDevice.cpp GpuDevice.h
+        Renderer.cpp Renderer.h
+        )
 
 target_compile_definitions(LearnVulkan PUBLIC GLFW_INCLUDE_VULKAN)
 
