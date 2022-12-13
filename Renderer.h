@@ -29,6 +29,12 @@ private:
 
     void CreateFramebuffers();
 
+    void CreatePipelineLayout();
+
+    void CreateShaders();
+
+    void CreatePipeline();
+
     GpuDevice *m_device = nullptr;
 
     VkCommandPool m_commandPool = VK_NULL_HANDLE;
@@ -36,4 +42,11 @@ private:
 
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> m_framebuffers;
+
+    VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
+
+    VkShaderModule m_vertexShader = VK_NULL_HANDLE;
+    VkShaderModule m_fragmentShader = VK_NULL_HANDLE;
+
+    VkPipeline m_pipeline = VK_NULL_HANDLE;
 };

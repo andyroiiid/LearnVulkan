@@ -443,6 +443,33 @@ VkFramebuffer GpuDevice::CreateFramebuffer(const VkFramebufferCreateInfo &create
     return framebuffer;
 }
 
+VkShaderModule GpuDevice::CreateShaderModule(const VkShaderModuleCreateInfo &createInfo) {
+    VkShaderModule shaderModule = VK_NULL_HANDLE;
+    DebugCheckCriticalVk(
+            vkCreateShaderModule(m_device, &createInfo, nullptr, &shaderModule),
+            "Failed to create Vulkan shader module."
+    );
+    return shaderModule;
+}
+
+VkPipelineLayout GpuDevice::CreatePipelineLayout(const VkPipelineLayoutCreateInfo &createInfo) {
+    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+    DebugCheckCriticalVk(
+            vkCreatePipelineLayout(m_device, &createInfo, nullptr, &pipelineLayout),
+            "Failed to create Vulkan pipeline layout."
+    );
+    return pipelineLayout;
+}
+
+VkPipeline GpuDevice::CreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo &createInfo) {
+    VkPipeline pipeline = VK_NULL_HANDLE;
+    DebugCheckCriticalVk(
+            vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &pipeline),
+            "Failed to create Vulkan pipeline."
+    );
+    return pipeline;
+}
+
 uint32_t GpuDevice::WaitForFrame() {
     DebugCheckCriticalVk(
             vkWaitForFences(m_device, 1, &m_renderFence, true, 1'000'000'000),

@@ -11,6 +11,7 @@ Window::Window() {
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     m_window = glfwCreateWindow(800, 600, "Learn Vulkan", nullptr, nullptr);
     DebugCheckCritical(m_window != nullptr, "Failed to create GLFW window.");
 
@@ -28,6 +29,7 @@ Window::~Window() {
 }
 
 void Window::MainLoop() {
+    glfwShowWindow(m_window);
     while (!glfwWindowShouldClose(m_window)) {
         glfwPollEvents();
         m_renderer->Draw();

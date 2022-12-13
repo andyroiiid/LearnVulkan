@@ -37,11 +37,23 @@ public:
 
     VkFramebuffer CreateFramebuffer(const VkFramebufferCreateInfo &createInfo);
 
+    VkShaderModule CreateShaderModule(const VkShaderModuleCreateInfo &createInfo);
+
+    VkPipelineLayout CreatePipelineLayout(const VkPipelineLayoutCreateInfo &createInfo);
+
+    VkPipeline CreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo &createInfo);
+
     void DestroyCommandPool(VkCommandPool commandPool) { vkDestroyCommandPool(m_device, commandPool, nullptr); }
 
     void DestroyRenderPass(VkRenderPass renderPass) { vkDestroyRenderPass(m_device, renderPass, nullptr); }
 
     void DestroyFramebuffer(VkFramebuffer framebuffer) { vkDestroyFramebuffer(m_device, framebuffer, nullptr); }
+
+    void DestroyShaderModule(VkShaderModule shaderModule) { vkDestroyShaderModule(m_device, shaderModule, nullptr); }
+
+    void DestroyPipelineLayout(VkPipelineLayout pipelineLayout) { vkDestroyPipelineLayout(m_device, pipelineLayout, nullptr); }
+
+    void DestroyPipeline(VkPipeline pipeline) { vkDestroyPipeline(m_device, pipeline, nullptr); }
 
     VkResult WaitIdle() { return vkDeviceWaitIdle(m_device); }
 
