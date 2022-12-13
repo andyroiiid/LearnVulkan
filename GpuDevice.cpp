@@ -14,7 +14,7 @@ GpuDevice::GpuDevice(GLFWwindow *window) {
     CreateInstance();
     CreateDebugMessenger();
     CreateSurface();
-    SelectPhysicalDeviceAndGraphicsQueueFamilyIndex();
+    SelectPhysicalDeviceAndQueueFamilyIndices();
     CreateDevice();
     CreateSyncPrimitives();
     CreateSwapchain();
@@ -42,7 +42,7 @@ void GpuDevice::CreateInstance() {
     applicationInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     applicationInfo.pEngineName = "Learn Vulkan";
     applicationInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    applicationInfo.apiVersion = VK_API_VERSION_1_0;
+    applicationInfo.apiVersion = VK_API_VERSION_1_3;
 
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -199,7 +199,7 @@ static VkPresentModeKHR PickPresentMode(const std::vector<VkPresentModeKHR> &pre
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-void GpuDevice::SelectPhysicalDeviceAndGraphicsQueueFamilyIndex() {
+void GpuDevice::SelectPhysicalDeviceAndQueueFamilyIndices() {
     std::vector<VkPhysicalDevice> devices = EnumeratePhysicalDevices(m_instance);
     for (const VkPhysicalDevice &device: devices) {
         VkPhysicalDeviceProperties deviceProperties;

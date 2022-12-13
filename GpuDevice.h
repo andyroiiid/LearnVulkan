@@ -56,7 +56,7 @@ private:
 
     void CreateSurface();
 
-    void SelectPhysicalDeviceAndGraphicsQueueFamilyIndex();
+    void SelectPhysicalDeviceAndQueueFamilyIndices();
 
     void CreateDevice();
 
