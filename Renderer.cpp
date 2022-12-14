@@ -15,6 +15,7 @@ struct PushConstantData {
 };
 
 Renderer::Renderer(GLFWwindow *window) {
+    m_window = window;
     m_device = std::make_unique<VulkanBase>(window);
     CreateRenderPass();
     CreateFramebuffers();
@@ -132,9 +133,14 @@ void main()
 }
 )GLSL"}
     };
-    pipelineCreateInfo.RenderPass = m_renderPass;
     pipelineCreateInfo.VertexInput = &VertexBase::GetPipelineVertexInputStateCreateInfo();
-    m_pipeline = std::make_unique<VulkanPipeline>(pipelineCreateInfo);
+    pipelineCreateInfo.RenderPass = m_renderPass;
+
+    m_fillPipeline = std::make_unique<VulkanPipeline>(pipelineCreateInfo);
+
+    pipelineCreateInfo.PolygonMode = VK_POLYGON_MODE_LINE;
+    pipelineCreateInfo.CullMode = VK_CULL_MODE_NONE;
+    m_wirePipeline = std::make_unique<VulkanPipeline>(pipelineCreateInfo);
 }
 
 void Renderer::CreateVertexBuffer() {
@@ -161,7 +167,8 @@ Renderer::~Renderer() {
 
     m_device->DestroyBuffer(m_vertexBuffer);
 
-    m_pipeline.reset();
+    m_fillPipeline.reset();
+    m_wirePipeline.reset();
 
     for (auto &framebuffer: m_framebuffers) {
         m_device->DestroyFramebuffer(framebuffer);
@@ -172,7 +179,7 @@ Renderer::~Renderer() {
 }
 
 void Renderer::Frame(float deltaTime) {
-    m_rotation += glm::radians(deltaTime * 90.0f);
+    m_rotation += glm::radians(deltaTime * m_rotationSpeed);
 
     auto [swapchainImageIndex, bufferingIndex, cmd] = m_device->BeginFrame();
 
@@ -194,7 +201,8 @@ void Renderer::Frame(float deltaTime) {
     renderPassBeginInfo.pClearValues = clearValues;
     vkCmdBeginRenderPass(cmd, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    m_pipeline->Bind(cmd);
+    VulkanPipeline *pipeline = m_fill ? m_fillPipeline.get() : m_wirePipeline.get();
+    pipeline->Bind(cmd);
     const VkExtent2D &swapchainExtent = m_device->GetSwapchainExtent();
     const glm::mat4 projection = glm::perspective(
             glm::radians(60.0f),
@@ -211,7 +219,7 @@ void Renderer::Frame(float deltaTime) {
     const PushConstantData pushConstant{
             projection * view * model
     };
-    m_pipeline->PushConstant(cmd, pushConstant);
+    pipeline->PushConstant(cmd, pushConstant);
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuffer.Buffer, &offset);
     vkCmdDraw(cmd, 36, 1, 0, 0);
@@ -219,4 +227,22 @@ void Renderer::Frame(float deltaTime) {
     vkCmdEndRenderPass(cmd);
 
     m_device->EndFrame();
+}
+
+void Renderer::OnKeyDown(int key) {
+    if (key == GLFW_KEY_ESCAPE) {
+        glfwSetWindowShouldClose(m_window, GLFW_TRUE);
+    }
+    if (key == GLFW_KEY_TAB) {
+        m_fill = !m_fill;
+    }
+    if (key == GLFW_KEY_SPACE) {
+        m_rotationSpeed = 90.0f;
+    }
+}
+
+void Renderer::OnKeyUp(int key) {
+    if (key == GLFW_KEY_SPACE) {
+        m_rotationSpeed = 0.0f;
+    }
 }

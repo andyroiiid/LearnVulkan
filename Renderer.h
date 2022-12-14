@@ -25,6 +25,10 @@ public:
 
     void Frame(float deltaTime);
 
+    void OnKeyDown(int key);
+
+    void OnKeyUp(int key);
+
 private:
     void CreateRenderPass();
 
@@ -34,14 +38,18 @@ private:
 
     void CreateVertexBuffer();
 
+    GLFWwindow *m_window = nullptr;
     std::unique_ptr<VulkanBase> m_device;
 
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> m_framebuffers;
 
-    std::unique_ptr<VulkanPipeline> m_pipeline;
+    bool m_fill = true;
+    std::unique_ptr<VulkanPipeline> m_fillPipeline;
+    std::unique_ptr<VulkanPipeline> m_wirePipeline;
 
     VulkanBuffer m_vertexBuffer;
 
+    float m_rotationSpeed = 0.0f;
     float m_rotation = 0.0f;
 };

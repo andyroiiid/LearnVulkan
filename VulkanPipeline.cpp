@@ -86,8 +86,7 @@ void VulkanPipeline::CreatePipeline(const VulkanPipelineCreateInfo &createInfo) 
 
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyState{};
     inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssemblyState.primitiveRestartEnable = VK_FALSE;
+    inputAssemblyState.topology = createInfo.Topology;
 
     const VkExtent2D &size = m_device->GetSwapchainExtent();
     // flipped upside down so that it's consistent with OpenGL
@@ -109,8 +108,8 @@ void VulkanPipeline::CreatePipeline(const VulkanPipelineCreateInfo &createInfo) 
 
     VkPipelineRasterizationStateCreateInfo rasterizationState{};
     rasterizationState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizationState.cullMode = VK_CULL_MODE_NONE;
+    rasterizationState.polygonMode = createInfo.PolygonMode;
+    rasterizationState.cullMode = createInfo.CullMode;
     rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizationState.lineWidth = 1.0f;
 
@@ -122,9 +121,9 @@ void VulkanPipeline::CreatePipeline(const VulkanPipelineCreateInfo &createInfo) 
 
     VkPipelineDepthStencilStateCreateInfo depthStencilState{};
     depthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencilState.depthTestEnable = VK_TRUE;
-    depthStencilState.depthWriteEnable = VK_TRUE;
-    depthStencilState.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencilState.depthTestEnable = createInfo.DepthTestEnable;
+    depthStencilState.depthWriteEnable = createInfo.DepthWriteEnable;
+    depthStencilState.depthCompareOp = createInfo.DepthCompareOp;
 
     VkPipelineColorBlendAttachmentState colorBlendAttachmentState{};
     colorBlendAttachmentState.blendEnable = VK_FALSE;

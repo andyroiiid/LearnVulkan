@@ -18,8 +18,14 @@ struct VulkanPipelineCreateInfo {
 
     std::vector<VulkanShaderStageCreateInfo> ShaderStages;
 
-    VkRenderPass RenderPass = VK_NULL_HANDLE;
+    VkPrimitiveTopology Topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    VkPolygonMode PolygonMode = VK_POLYGON_MODE_FILL;
+    VkCullModeFlags CullMode = VK_CULL_MODE_BACK_BIT;
+    VkBool32 DepthTestEnable = VK_TRUE;
+    VkBool32 DepthWriteEnable = VK_TRUE;
+    VkCompareOp DepthCompareOp = VK_COMPARE_OP_LESS;
     const VkPipelineVertexInputStateCreateInfo *VertexInput = nullptr;
+    VkRenderPass RenderPass = VK_NULL_HANDLE;
 };
 
 class VulkanPipeline {

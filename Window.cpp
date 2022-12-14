@@ -15,6 +15,16 @@ Window::Window() {
     m_window = glfwCreateWindow(800, 600, "Learn Vulkan", nullptr, nullptr);
     DebugCheckCritical(m_window != nullptr, "Failed to create GLFW window.");
 
+    glfwSetWindowUserPointer(m_window, this);
+    glfwSetKeyCallback(m_window, [](GLFWwindow *glfwWindow, int key, int scancode, int action, int mods) {
+        auto window = static_cast<Window *>(glfwGetWindowUserPointer(glfwWindow));
+        if (action == GLFW_PRESS) {
+            window->m_renderer->OnKeyDown(key);
+        } else if (action == GLFW_RELEASE) {
+            window->m_renderer->OnKeyUp(key);
+        }
+    });
+
     m_renderer = std::make_unique<Renderer>(m_window);
 }
 
