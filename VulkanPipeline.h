@@ -4,19 +4,27 @@
 
 #pragma once
 
-#include <glm/mat4x4.hpp>
-
 #include "VulkanBase.h"
 
+struct VulkanShaderStageCreateInfo {
+    VkShaderStageFlagBits Stage{};
+    const char *Source = nullptr;
+};
+
 struct VulkanPipelineCreateInfo {
+    VulkanBase *Device = nullptr;
+
     uint32_t PushConstantSize = 0;
+
+    std::vector<VulkanShaderStageCreateInfo> ShaderStages;
+
     VkRenderPass RenderPass = VK_NULL_HANDLE;
     const VkPipelineVertexInputStateCreateInfo *VertexInput = nullptr;
 };
 
 class VulkanPipeline {
 public:
-    VulkanPipeline(VulkanBase *device, const VulkanPipelineCreateInfo &createInfo);
+    explicit VulkanPipeline(const VulkanPipelineCreateInfo &createInfo);
 
     ~VulkanPipeline();
 
@@ -34,13 +42,13 @@ public:
 
     template<class T>
     void PushConstant(VkCommandBuffer commandBuffer, const T &pushConstantData) {
-        vkCmdPushConstants(commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(T), &pushConstantData);
+        vkCmdPushConstants(commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(T), &pushConstantData);
     }
 
 private:
     void CreatePipelineLayout(const VulkanPipelineCreateInfo &createInfo);
 
-    void CreateShaders();
+    void CreateShaderStages(const VulkanPipelineCreateInfo &createInfo);
 
     void CreatePipeline(const VulkanPipelineCreateInfo &createInfo);
 
@@ -48,8 +56,11 @@ private:
 
     VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 
-    VkShaderModule m_vertexShader = VK_NULL_HANDLE;
-    VkShaderModule m_fragmentShader = VK_NULL_HANDLE;
+    struct ShaderStage {
+        VkShaderStageFlagBits Stage{};
+        VkShaderModule Module = VK_NULL_HANDLE;
+    };
+    std::vector<ShaderStage> m_shaderStages;
 
     VkPipeline m_pipeline = VK_NULL_HANDLE;
 };

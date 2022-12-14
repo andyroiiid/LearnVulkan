@@ -7,16 +7,16 @@
 #include "Debug.h"
 #include "ShaderCompiler.h"
 
-VulkanPipeline::VulkanPipeline(VulkanBase *device, const VulkanPipelineCreateInfo &createInfo)
-        : m_device(device) {
+VulkanPipeline::VulkanPipeline(const VulkanPipelineCreateInfo &createInfo)
+        : m_device(createInfo.Device) {
     CreatePipelineLayout(createInfo);
-    CreateShaders();
+    CreateShaderStages(createInfo);
     CreatePipeline(createInfo);
 }
 
 void VulkanPipeline::CreatePipelineLayout(const VulkanPipelineCreateInfo &createInfo) {
     VkPushConstantRange pushConstantRange;
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
     pushConstantRange.offset = 0;
     pushConstantRange.size = createInfo.PushConstantSize;
 
@@ -29,79 +29,57 @@ void VulkanPipeline::CreatePipelineLayout(const VulkanPipelineCreateInfo &create
     m_pipelineLayout = m_device->CreatePipelineLayout(pipelineLayoutCreateInfo);
 }
 
-void VulkanPipeline::CreateShaders() {
-    ShaderCompiler shaderCompiler;
-
-    const char *vertexSource = R"GLSL(
-#version 450 core
-
-layout (location = 0) in vec3 aPosition;
-layout (location = 1) in vec3 aNormal;
-layout (location = 2) in vec2 aTexCoord;
-
-layout (location = 0) out vec4 vColor;
-
-layout (push_constant) uniform PushConstant
-{
-    mat4 uMatrix;
-};
-
-void main()
-{
-    gl_Position = uMatrix * vec4(aPosition, 1);
-    vColor = vec4(aTexCoord, 0, 1);
+static inline std::tuple<EShLanguage, const char *> GetShaderStageLanguageAndName(VkShaderStageFlagBits stage) {
+    switch (stage) {
+    case VK_SHADER_STAGE_VERTEX_BIT:
+        return {EShLangVertex, "vertex"};
+    case VK_SHADER_STAGE_GEOMETRY_BIT:
+        return {EShLangGeometry, "geometry"};
+    case VK_SHADER_STAGE_FRAGMENT_BIT:
+        return {EShLangFragment, "fragment"};
+    case VK_SHADER_STAGE_COMPUTE_BIT:
+        return {EShLangCompute, "compute"};
+    default:
+        return {{}, "unsupported stage"};
+    }
 }
-)GLSL";
-    const char *fragmentSource = R"GLSL(
-#version 450 core
 
-layout (location = 0) in vec4 vColor;
+static std::vector<uint32_t> CompileShader(const VulkanShaderStageCreateInfo &stageCreateInfo) {
+    ShaderCompiler &shaderCompiler = ShaderCompiler::GetInstance();
+    auto [stage, stageName] = GetShaderStageLanguageAndName(stageCreateInfo.Stage);
 
-layout (location = 0) out vec4 fColor;
-
-void main()
-{
-    fColor = vColor;
+    std::vector<uint32_t> spirv;
+    DebugCheckCritical(
+            shaderCompiler.Compile(stage, stageCreateInfo.Source, spirv),
+            "Failed to compile {} shader.", stageName
+    );
+    return spirv;
 }
-)GLSL";
 
-    std::vector<uint32_t> vertexSpirv;
-    std::vector<uint32_t> fragmentSpirv;
+void VulkanPipeline::CreateShaderStages(const VulkanPipelineCreateInfo &createInfo) {
+    size_t numShaderStages = createInfo.ShaderStages.size();
+    m_shaderStages.reserve(numShaderStages);
+    for (const VulkanShaderStageCreateInfo &stageCreateInfo: createInfo.ShaderStages) {
+        std::vector<uint32_t> spirv = CompileShader(stageCreateInfo);
 
-    DebugCheckCritical(
-            shaderCompiler.Compile(EShLangVertex, vertexSource, vertexSpirv),
-            "Failed to compile vertex shader."
-    );
-    DebugCheckCritical(
-            shaderCompiler.Compile(EShLangFragment, fragmentSource, fragmentSpirv),
-            "Failed to compile fragment shader."
-    );
+        VkShaderModuleCreateInfo shaderModuleCreateInfo{};
+        shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        shaderModuleCreateInfo.codeSize = spirv.size() * sizeof(uint32_t);
+        shaderModuleCreateInfo.pCode = spirv.data();
 
-    VkShaderModuleCreateInfo vertexShaderCreateInfo{};
-    vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    vertexShaderCreateInfo.codeSize = vertexSpirv.size() * sizeof(uint32_t);
-    vertexShaderCreateInfo.pCode = vertexSpirv.data();
-    m_vertexShader = m_device->CreateShaderModule(vertexShaderCreateInfo);
-
-    VkShaderModuleCreateInfo fragmentShaderCreateInfo{};
-    fragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    fragmentShaderCreateInfo.codeSize = fragmentSpirv.size() * sizeof(uint32_t);
-    fragmentShaderCreateInfo.pCode = fragmentSpirv.data();
-    m_fragmentShader = m_device->CreateShaderModule(fragmentShaderCreateInfo);
+        ShaderStage &shaderStage = m_shaderStages.emplace_back();
+        shaderStage.Stage = stageCreateInfo.Stage;
+        shaderStage.Module = m_device->CreateShaderModule(shaderModuleCreateInfo);
+    }
 }
 
 void VulkanPipeline::CreatePipeline(const VulkanPipelineCreateInfo &createInfo) {
-    std::vector<std::tuple<VkShaderStageFlagBits, VkShaderModule>> shaderStages = {
-            {VK_SHADER_STAGE_VERTEX_BIT,   m_vertexShader},
-            {VK_SHADER_STAGE_FRAGMENT_BIT, m_fragmentShader}
-    };
-
     std::vector<VkPipelineShaderStageCreateInfo> stages;
-    for (const auto &[stage, module]: shaderStages) {
+    for (ShaderStage &shaderStage: m_shaderStages) {
         VkPipelineShaderStageCreateInfo shaderStageCreateInfo{};
         shaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        shaderStageCreateInfo.stage = stage;
-        shaderStageCreateInfo.module = module;
+        shaderStageCreateInfo.stage = shaderStage.Stage;
+        shaderStageCreateInfo.module = shaderStage.Module;
         shaderStageCreateInfo.pName = "main";
         stages.push_back(shaderStageCreateInfo);
     }
@@ -182,7 +160,8 @@ void VulkanPipeline::CreatePipeline(const VulkanPipelineCreateInfo &createInfo) 
 
 VulkanPipeline::~VulkanPipeline() {
     m_device->DestroyPipeline(m_pipeline);
-    m_device->DestroyShaderModule(m_vertexShader);
-    m_device->DestroyShaderModule(m_fragmentShader);
+    for (ShaderStage &shaderStage: m_shaderStages) {
+        m_device->DestroyShaderModule(shaderStage.Module);
+    }
     m_device->DestroyPipelineLayout(m_pipelineLayout);
 }

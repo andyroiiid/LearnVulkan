@@ -30,6 +30,8 @@ private:
 
     void CreateFramebuffers();
 
+    void CreatePipeline();
+
     void CreateVertexBuffer();
 
     std::unique_ptr<VulkanBase> m_device;

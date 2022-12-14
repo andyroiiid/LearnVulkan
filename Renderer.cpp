@@ -16,16 +16,9 @@ struct PushConstantData {
 
 Renderer::Renderer(GLFWwindow *window) {
     m_device = std::make_unique<VulkanBase>(window);
-
     CreateRenderPass();
     CreateFramebuffers();
-
-    VulkanPipelineCreateInfo pipelineCreateInfo{};
-    pipelineCreateInfo.PushConstantSize = sizeof(PushConstantData);
-    pipelineCreateInfo.RenderPass = m_renderPass;
-    pipelineCreateInfo.VertexInput = &VertexBase::GetPipelineVertexInputStateCreateInfo();
-    m_pipeline = std::make_unique<VulkanPipeline>(m_device.get(), pipelineCreateInfo);
-
+    CreatePipeline();
     CreateVertexBuffer();
 }
 
@@ -99,6 +92,49 @@ void Renderer::CreateFramebuffers() {
         createInfo.layers = 1;
         m_framebuffers[i] = m_device->CreateFramebuffer(createInfo);
     }
+}
+
+void Renderer::CreatePipeline() {
+    VulkanPipelineCreateInfo pipelineCreateInfo{};
+    pipelineCreateInfo.Device = m_device.get();
+    pipelineCreateInfo.PushConstantSize = sizeof(PushConstantData);
+    pipelineCreateInfo.ShaderStages = {
+            {VK_SHADER_STAGE_VERTEX_BIT,   R"GLSL(
+#version 450 core
+
+layout (location = 0) in vec3 aPosition;
+layout (location = 1) in vec3 aNormal;
+layout (location = 2) in vec2 aTexCoord;
+
+layout (location = 0) out vec4 vColor;
+
+layout (push_constant) uniform PushConstant
+{
+    mat4 uMatrix;
+};
+
+void main()
+{
+    gl_Position = uMatrix * vec4(aPosition, 1);
+    vColor = vec4(aTexCoord, 0, 1);
+}
+)GLSL"},
+            {VK_SHADER_STAGE_FRAGMENT_BIT, R"GLSL(
+#version 450 core
+
+layout (location = 0) in vec4 vColor;
+
+layout (location = 0) out vec4 fColor;
+
+void main()
+{
+    fColor = vColor;
+}
+)GLSL"}
+    };
+    pipelineCreateInfo.RenderPass = m_renderPass;
+    pipelineCreateInfo.VertexInput = &VertexBase::GetPipelineVertexInputStateCreateInfo();
+    m_pipeline = std::make_unique<VulkanPipeline>(pipelineCreateInfo);
 }
 
 void Renderer::CreateVertexBuffer() {

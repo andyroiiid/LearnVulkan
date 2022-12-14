@@ -9,6 +9,11 @@
 
 #include "Debug.h"
 
+ShaderCompiler &ShaderCompiler::GetInstance() {
+    static ShaderCompiler instance;
+    return instance;
+}
+
 ShaderCompiler::ShaderCompiler() {
     DebugInfo("glslang version: {}", glslang::GetGlslVersionString());
     DebugCheckCritical(glslang::InitializeProcess(), "Failed to initialize glslang.");
@@ -28,7 +33,7 @@ bool ShaderCompiler::Compile(const EShLanguage stage, const char *source, std::v
     shader.setPreamble(m_preamble.c_str());
     shader.setEnvInput(glslang::EShSourceGlsl, stage, glslang::EShClientVulkan, 100);
     shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
-    shader.setEnvTarget(glslang::EshTargetSpv, glslang::EShTargetSpv_1_6);
+    shader.setEnvTarget(glslang::EshTargetSpv, glslang::EShTargetSpv_1_0);
 
     if (!shader.parse(GetDefaultResources(), 100, false, EShMsgDefault)) {
         DebugError("Failed to parse shader: {}", shader.getInfoLog());
