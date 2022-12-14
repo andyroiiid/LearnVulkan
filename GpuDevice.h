@@ -91,7 +91,7 @@ public:
         imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
         imageCreateInfo.format = format;
-        imageCreateInfo.extent = {extent.width, extent.width, 1};
+        imageCreateInfo.extent = {extent.width, extent.height, 1};
         imageCreateInfo.mipLevels = 1;
         imageCreateInfo.arrayLayers = 1;
         imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
