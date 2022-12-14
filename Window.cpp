@@ -15,13 +15,11 @@ Window::Window() {
     m_window = glfwCreateWindow(800, 600, "Learn Vulkan", nullptr, nullptr);
     DebugCheckCritical(m_window != nullptr, "Failed to create GLFW window.");
 
-    m_gpu = std::make_unique<VulkanDevice>(m_window);
-    m_renderer = std::make_unique<Renderer>(m_gpu.get());
+    m_renderer = std::make_unique<Renderer>(m_window);
 }
 
 Window::~Window() {
     m_renderer.reset();
-    m_gpu.reset();
 
     glfwDestroyWindow(m_window);
 

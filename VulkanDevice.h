@@ -34,14 +34,6 @@ public:
 
     [[nodiscard]] const VkSurfaceFormatKHR &GetSurfaceFormat() const { return m_surfaceFormat; }
 
-    [[nodiscard]] const VkExtent2D &GetSwapchainExtent() const { return m_swapchainExtent; }
-
-    [[nodiscard]] const std::vector<VkImageView> &GetSwapchainImageViews() const { return m_swapchainImageViews; }
-
-    [[nodiscard]] const VkFormat &GetDepthStencilFormat() const { return m_depthStencilFormat; }
-
-    [[nodiscard]] const std::vector<VkImageView> &GetDepthStencilImageViews() const { return m_depthStencilImageViews; }
-
     VkRenderPass CreateRenderPass(const VkRenderPassCreateInfo &createInfo);
 
     VkFramebuffer CreateFramebuffer(const VkFramebufferCreateInfo &createInfo);
@@ -118,15 +110,11 @@ public:
 
     VkResult WaitIdle() { return vkDeviceWaitIdle(m_device); }
 
-    std::tuple<uint32_t, VkCommandBuffer> BeginFrame();
-
-    void EndFrame();
-
     void *MapMemory(VmaAllocation allocation);
 
     void UnmapMemory(VmaAllocation allocation);
 
-private:
+protected:
     void CreateInstance();
 
     void CreateDebugMessenger();
@@ -138,16 +126,6 @@ private:
     void CreateDevice();
 
     void CreateAllocator();
-
-    void CreateSwapchain();
-
-    void CreateSwapchainImageViews();
-
-    void CreateDepthStencilImageAndViews();
-
-    void CreateSyncPrimitives();
-
-    void CreateCommandPoolAndBuffer();
 
     GLFWwindow *m_window = nullptr;
 
@@ -166,22 +144,4 @@ private:
     VkQueue m_presentQueue = VK_NULL_HANDLE;
 
     VmaAllocator m_allocator = VK_NULL_HANDLE;
-
-    VkExtent2D m_swapchainExtent{};
-    VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
-    std::vector<VkImage> m_swapchainImages;
-    std::vector<VkImageView> m_swapchainImageViews;
-
-    VkFormat m_depthStencilFormat = VK_FORMAT_D32_SFLOAT;
-    std::vector<VulkanImage> m_depthStencilImages;
-    std::vector<VkImageView> m_depthStencilImageViews;
-
-    uint32_t m_currentSwapchainImageIndex = 0;
-
-    VkFence m_renderFence = VK_NULL_HANDLE;
-    VkSemaphore m_presentSemaphore = VK_NULL_HANDLE;
-    VkSemaphore m_renderSemaphore = VK_NULL_HANDLE;
-
-    VkCommandPool m_commandPool = VK_NULL_HANDLE;
-    VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
 };

@@ -16,8 +16,9 @@ struct PushConstantData {
     glm::mat4 Matrix;
 };
 
-Renderer::Renderer(VulkanDevice *device)
-        : m_device(device) {
+Renderer::Renderer(GLFWwindow *window) {
+    m_device = std::make_unique<VulkanBase>(window);
+
     CreateRenderPass();
     CreateFramebuffers();
     CreatePipelineLayout();

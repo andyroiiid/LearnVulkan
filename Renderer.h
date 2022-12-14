@@ -4,11 +4,13 @@
 
 #pragma once
 
-#include "VulkanDevice.h"
+#include <memory>
+
+#include "VulkanBase.h"
 
 class Renderer {
 public:
-    explicit Renderer(VulkanDevice *device);
+    explicit Renderer(GLFWwindow *window);
 
     ~Renderer();
 
@@ -35,7 +37,7 @@ private:
 
     void CreateVertexBuffer();
 
-    VulkanDevice *m_device = nullptr;
+    std::unique_ptr<VulkanBase> m_device;
 
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> m_framebuffers;
