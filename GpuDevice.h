@@ -32,8 +32,6 @@ public:
 
     GpuDevice &operator=(GpuDevice &&) = delete;
 
-    [[nodiscard]] uint32_t GetGraphicsQueueFamilyIndex() const { return m_graphicsQueueFamilyIndex; }
-
     [[nodiscard]] const VkSurfaceFormatKHR &GetSurfaceFormat() const { return m_surfaceFormat; }
 
     [[nodiscard]] const VkExtent2D &GetSwapchainExtent() const { return m_swapchainExtent; }
@@ -43,10 +41,6 @@ public:
     [[nodiscard]] const VkFormat &GetDepthStencilFormat() const { return m_depthStencilFormat; }
 
     [[nodiscard]] const std::vector<VkImageView> &GetDepthStencilImageViews() const { return m_depthStencilImageViews; }
-
-    VkCommandPool CreateCommandPool(const VkCommandPoolCreateInfo &createInfo);
-
-    VkCommandBuffer AllocateCommandBuffer(const VkCommandBufferAllocateInfo &allocateInfo);
 
     VkRenderPass CreateRenderPass(const VkRenderPassCreateInfo &createInfo);
 
@@ -106,8 +100,6 @@ public:
 
     VkImageView CreateImageView(const VkImageViewCreateInfo &createInfo);
 
-    void DestroyCommandPool(VkCommandPool commandPool) { vkDestroyCommandPool(m_device, commandPool, nullptr); }
-
     void DestroyRenderPass(VkRenderPass renderPass) { vkDestroyRenderPass(m_device, renderPass, nullptr); }
 
     void DestroyFramebuffer(VkFramebuffer framebuffer) { vkDestroyFramebuffer(m_device, framebuffer, nullptr); }
@@ -126,9 +118,9 @@ public:
 
     VkResult WaitIdle() { return vkDeviceWaitIdle(m_device); }
 
-    uint32_t WaitForFrame();
+    std::tuple<uint32_t, VkCommandBuffer> BeginFrame();
 
-    void SubmitAndPresent(uint32_t swapchainImageIndex, VkCommandBuffer commandBuffer);
+    void EndFrame();
 
     void *MapMemory(VmaAllocation allocation);
 
@@ -147,13 +139,15 @@ private:
 
     void CreateAllocator();
 
-    void CreateSyncPrimitives();
-
     void CreateSwapchain();
 
     void CreateSwapchainImageViews();
 
     void CreateDepthStencilImageAndViews();
+
+    void CreateSyncPrimitives();
+
+    void CreateCommandPoolAndBuffer();
 
     GLFWwindow *m_window = nullptr;
 
@@ -173,10 +167,6 @@ private:
 
     VmaAllocator m_allocator = VK_NULL_HANDLE;
 
-    VkFence m_renderFence = VK_NULL_HANDLE;
-    VkSemaphore m_presentSemaphore = VK_NULL_HANDLE;
-    VkSemaphore m_renderSemaphore = VK_NULL_HANDLE;
-
     VkExtent2D m_swapchainExtent{};
     VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
     std::vector<VkImage> m_swapchainImages;
@@ -185,4 +175,13 @@ private:
     VkFormat m_depthStencilFormat = VK_FORMAT_D32_SFLOAT;
     std::vector<GpuImage> m_depthStencilImages;
     std::vector<VkImageView> m_depthStencilImageViews;
+
+    uint32_t m_currentSwapchainImageIndex = 0;
+
+    VkFence m_renderFence = VK_NULL_HANDLE;
+    VkSemaphore m_presentSemaphore = VK_NULL_HANDLE;
+    VkSemaphore m_renderSemaphore = VK_NULL_HANDLE;
+
+    VkCommandPool m_commandPool = VK_NULL_HANDLE;
+    VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
 };

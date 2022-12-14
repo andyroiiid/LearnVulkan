@@ -16,30 +16,14 @@ struct PushConstantData {
     glm::mat4 Matrix;
 };
 
-Renderer::Renderer(GpuDevice *device) {
-    m_device = device;
-    CreateCommandBuffer();
+Renderer::Renderer(GpuDevice *device)
+        : m_device(device) {
     CreateRenderPass();
     CreateFramebuffers();
     CreatePipelineLayout();
     CreateShaders();
     CreatePipeline();
     CreateVertexBuffer();
-}
-
-void Renderer::CreateCommandBuffer() {
-    VkCommandPoolCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    createInfo.queueFamilyIndex = m_device->GetGraphicsQueueFamilyIndex();
-    m_commandPool = m_device->CreateCommandPool(createInfo);
-
-    VkCommandBufferAllocateInfo allocateInfo{};
-    allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocateInfo.commandPool = m_commandPool;
-    allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocateInfo.commandBufferCount = 1;
-    m_commandBuffer = m_device->AllocateCommandBuffer(allocateInfo);
 }
 
 void Renderer::CreateRenderPass() {
@@ -313,24 +297,10 @@ Renderer::~Renderer() {
         m_device->DestroyFramebuffer(framebuffer);
     }
     m_device->DestroyRenderPass(m_renderPass);
-    m_device->DestroyCommandPool(m_commandPool);
 }
 
 void Renderer::Draw() {
-    uint32_t swapchainImageIndex = m_device->WaitForFrame();
-
-    DebugCheckCriticalVk(
-            vkResetCommandBuffer(m_commandBuffer, 0),
-            "Failed to reset Vulkan command buffer."
-    );
-
-    VkCommandBufferBeginInfo commandBufferBeginInfo{};
-    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    DebugCheckCriticalVk(
-            vkBeginCommandBuffer(m_commandBuffer, &commandBufferBeginInfo),
-            "Failed to begin Vulkan command buffer."
-    );
+    auto [swapchainImageIndex, cmd] = m_device->BeginFrame();
 
     VkClearValue clearValues[2];
     VkClearColorValue &clearColor = clearValues[0].color;
@@ -348,9 +318,9 @@ void Renderer::Draw() {
     renderPassBeginInfo.renderArea = {{0, 0}, m_device->GetSwapchainExtent()};
     renderPassBeginInfo.clearValueCount = 2;
     renderPassBeginInfo.pClearValues = clearValues;
-    vkCmdBeginRenderPass(m_commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(cmd, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     const VkExtent2D &swapchainExtent = m_device->GetSwapchainExtent();
     const glm::mat4 projection = glm::perspective(
             glm::radians(60.0f),
@@ -367,17 +337,12 @@ void Renderer::Draw() {
     const PushConstantData pushConstant{
             projection * view * model
     };
-    vkCmdPushConstants(m_commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pushConstant);
+    vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pushConstant);
     VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &m_vertexBuffer.Buffer, &offset);
-    vkCmdDraw(m_commandBuffer, 36, 1, 0, 0);
+    vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuffer.Buffer, &offset);
+    vkCmdDraw(cmd, 36, 1, 0, 0);
 
-    vkCmdEndRenderPass(m_commandBuffer);
+    vkCmdEndRenderPass(cmd);
 
-    DebugCheckCriticalVk(
-            vkEndCommandBuffer(m_commandBuffer),
-            "Failed to end Vulkan command buffer."
-    );
-
-    m_device->SubmitAndPresent(swapchainImageIndex, m_commandBuffer);
+    m_device->EndFrame();
 }

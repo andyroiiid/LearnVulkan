@@ -23,8 +23,6 @@ public:
     void Draw();
 
 private:
-    void CreateCommandBuffer();
-
     void CreateRenderPass();
 
     void CreateFramebuffers();
@@ -38,9 +36,6 @@ private:
     void CreateVertexBuffer();
 
     GpuDevice *m_device = nullptr;
-
-    VkCommandPool m_commandPool = VK_NULL_HANDLE;
-    VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
 
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> m_framebuffers;

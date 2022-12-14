@@ -17,10 +17,13 @@ GpuDevice::GpuDevice(GLFWwindow *window) {
     SelectPhysicalDeviceAndQueueFamilyIndices();
     CreateDevice();
     CreateAllocator();
-    CreateSyncPrimitives();
+
     CreateSwapchain();
     CreateSwapchainImageViews();
     CreateDepthStencilImageAndViews();
+
+    CreateSyncPrimitives();
+    CreateCommandPoolAndBuffer();
 }
 
 static std::vector<const char *> GetEnabledInstanceLayers() {
@@ -299,18 +302,6 @@ void GpuDevice::CreateAllocator() {
     );
 }
 
-void GpuDevice::CreateSyncPrimitives() {
-    VkFenceCreateInfo fenceCreateInfo{};
-    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    vkCreateFence(m_device, &fenceCreateInfo, nullptr, &m_renderFence);
-
-    VkSemaphoreCreateInfo semaphoreCreateInfo{};
-    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_presentSemaphore);
-    vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_renderSemaphore);
-}
-
 static VkExtent2D CalcSwapchainExtent(const VkSurfaceCapabilitiesKHR &capabilities, GLFWwindow *window) {
     if (capabilities.currentExtent.width == std::numeric_limits<uint32_t>::max() &&
         capabilities.currentExtent.height == std::numeric_limits<uint32_t>::max()) {
@@ -421,11 +412,58 @@ void GpuDevice::CreateDepthStencilImageAndViews() {
     }
 }
 
+void GpuDevice::CreateSyncPrimitives() {
+    VkFenceCreateInfo fenceCreateInfo{};
+    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    DebugCheckCriticalVk(
+            vkCreateFence(m_device, &fenceCreateInfo, nullptr, &m_renderFence),
+            "Failed to create Vulkan render fence."
+    );
+
+    VkSemaphoreCreateInfo semaphoreCreateInfo{};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    DebugCheckCriticalVk(
+            vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_presentSemaphore),
+            "Failed to create Vulkan present semaphore."
+    );
+    DebugCheckCriticalVk(
+            vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_renderSemaphore),
+            "Failed to create Vulkan render semaphore."
+    );
+}
+
+void GpuDevice::CreateCommandPoolAndBuffer() {
+    VkCommandPoolCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    createInfo.queueFamilyIndex = m_graphicsQueueFamilyIndex;
+    DebugCheckCriticalVk(
+            vkCreateCommandPool(m_device, &createInfo, nullptr, &m_commandPool),
+            "Failed to create Vulkan command pool."
+    );
+
+    VkCommandBufferAllocateInfo allocateInfo{};
+    allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocateInfo.commandPool = m_commandPool;
+    allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocateInfo.commandBufferCount = 1;
+    DebugCheckCriticalVk(
+            vkAllocateCommandBuffers(m_device, &allocateInfo, &m_commandBuffer),
+            "Failed to allocate Vulkan command buffer."
+    );
+}
+
 GpuDevice::~GpuDevice() {
     DebugCheckCriticalVk(
             WaitIdle(),
             "Failed to wait for Vulkan device when trying to cleanup."
     );
+
+    vkDestroyCommandPool(m_device, m_commandPool, nullptr);
+    vkDestroySemaphore(m_device, m_presentSemaphore, nullptr);
+    vkDestroySemaphore(m_device, m_renderSemaphore, nullptr);
+    vkDestroyFence(m_device, m_renderFence, nullptr);
 
     for (auto &depthStencilImageView: m_depthStencilImageViews) {
         DestroyImageView(depthStencilImageView);
@@ -437,32 +475,12 @@ GpuDevice::~GpuDevice() {
         DestroyImageView(swapchainImageView);
     }
     vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
-    vkDestroySemaphore(m_device, m_presentSemaphore, nullptr);
-    vkDestroySemaphore(m_device, m_renderSemaphore, nullptr);
-    vkDestroyFence(m_device, m_renderFence, nullptr);
+
     vmaDestroyAllocator(m_allocator);
     vkDestroyDevice(m_device, nullptr);
     vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
     vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
     vkDestroyInstance(m_instance, nullptr);
-}
-
-VkCommandPool GpuDevice::CreateCommandPool(const VkCommandPoolCreateInfo &createInfo) {
-    VkCommandPool commandPool = VK_NULL_HANDLE;
-    DebugCheckCriticalVk(
-            vkCreateCommandPool(m_device, &createInfo, nullptr, &commandPool),
-            "Failed to create Vulkan command pool."
-    );
-    return commandPool;
-}
-
-VkCommandBuffer GpuDevice::AllocateCommandBuffer(const VkCommandBufferAllocateInfo &allocateInfo) {
-    VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-    DebugCheckCriticalVk(
-            vkAllocateCommandBuffers(m_device, &allocateInfo, &commandBuffer),
-            "Failed to allocate Vulkan command buffer."
-    );
-    return commandBuffer;
 }
 
 VkRenderPass GpuDevice::CreateRenderPass(const VkRenderPassCreateInfo &createInfo) {
@@ -537,7 +555,7 @@ VkImageView GpuDevice::CreateImageView(const VkImageViewCreateInfo &createInfo) 
     return imageView;
 }
 
-uint32_t GpuDevice::WaitForFrame() {
+std::tuple<uint32_t, VkCommandBuffer> GpuDevice::BeginFrame() {
     DebugCheckCriticalVk(
             vkWaitForFences(m_device, 1, &m_renderFence, true, 1'000'000'000),
             "Failed to wait for Vulkan render fence."
@@ -546,15 +564,33 @@ uint32_t GpuDevice::WaitForFrame() {
             vkResetFences(m_device, 1, &m_renderFence),
             "Failed to reset Vulkan render fence."
     );
-    uint32_t swapchainImageIndex;
     DebugCheckCriticalVk(
-            vkAcquireNextImageKHR(m_device, m_swapchain, 1'000'000'000, m_presentSemaphore, nullptr, &swapchainImageIndex),
+            vkAcquireNextImageKHR(m_device, m_swapchain, 1'000'000'000, m_presentSemaphore, nullptr, &m_currentSwapchainImageIndex),
             "Failed to acquire next Vulkan swapchain image."
     );
-    return swapchainImageIndex;
+
+    DebugCheckCriticalVk(
+            vkResetCommandBuffer(m_commandBuffer, 0),
+            "Failed to reset Vulkan command buffer."
+    );
+
+    VkCommandBufferBeginInfo commandBufferBeginInfo{};
+    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    DebugCheckCriticalVk(
+            vkBeginCommandBuffer(m_commandBuffer, &commandBufferBeginInfo),
+            "Failed to begin Vulkan command buffer."
+    );
+
+    return {m_currentSwapchainImageIndex, m_commandBuffer};
 }
 
-void GpuDevice::SubmitAndPresent(uint32_t swapchainImageIndex, VkCommandBuffer commandBuffer) {
+void GpuDevice::EndFrame() {
+    DebugCheckCriticalVk(
+            vkEndCommandBuffer(m_commandBuffer),
+            "Failed to end Vulkan command buffer."
+    );
+
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.waitSemaphoreCount = 1;
@@ -562,7 +598,7 @@ void GpuDevice::SubmitAndPresent(uint32_t swapchainImageIndex, VkCommandBuffer c
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     submitInfo.pWaitDstStageMask = &waitStage;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
+    submitInfo.pCommandBuffers = &m_commandBuffer;
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &m_renderSemaphore;
     DebugCheckCriticalVk(
@@ -576,7 +612,7 @@ void GpuDevice::SubmitAndPresent(uint32_t swapchainImageIndex, VkCommandBuffer c
     presentInfo.pWaitSemaphores = &m_renderSemaphore;
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &m_swapchain;
-    presentInfo.pImageIndices = &swapchainImageIndex;
+    presentInfo.pImageIndices = &m_currentSwapchainImageIndex;
     DebugCheckCriticalVk(
             vkQueuePresentKHR(m_graphicsQueue, &presentInfo),
             "Failed to present Vulkan swapchain image."
