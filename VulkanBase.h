@@ -58,10 +58,6 @@ private:
     std::vector<VulkanImage> m_depthStencilImages;
     std::vector<VkImageView> m_depthStencilImageViews;
 
-    uint32_t m_currentSwapchainImageIndex = 0;
-    uint32_t m_currentFrameCount = 0;
-    uint32_t m_currentBufferingIndex = 0;
-
     struct BufferingObjects {
         VkFence RenderFence = VK_NULL_HANDLE;
         VkSemaphore PresentSemaphore = VK_NULL_HANDLE;
@@ -72,4 +68,8 @@ private:
     };
 
     std::vector<BufferingObjects> m_bufferingObjects;
+
+    uint32_t m_currentSwapchainImageIndex = 0;
+    uint32_t m_currentFrameCount = 0;
+    uint32_t m_currentBufferingIndex = 0;
 };

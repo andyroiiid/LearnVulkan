@@ -25,11 +25,11 @@ VulkanBase::~VulkanBase() {
             "Failed to wait for Vulkan device when trying to cleanup."
     );
 
-    for (const BufferingObjects &perFrameData: m_bufferingObjects) {
-        vkDestroyCommandPool(m_device, perFrameData.CommandPool, nullptr);
-        vkDestroySemaphore(m_device, perFrameData.PresentSemaphore, nullptr);
-        vkDestroySemaphore(m_device, perFrameData.RenderSemaphore, nullptr);
-        vkDestroyFence(m_device, perFrameData.RenderFence, nullptr);
+    for (const BufferingObjects &bufferingObjects: m_bufferingObjects) {
+        vkDestroyCommandPool(m_device, bufferingObjects.CommandPool, nullptr);
+        vkDestroySemaphore(m_device, bufferingObjects.PresentSemaphore, nullptr);
+        vkDestroySemaphore(m_device, bufferingObjects.RenderSemaphore, nullptr);
+        vkDestroyFence(m_device, bufferingObjects.RenderFence, nullptr);
     }
 
     for (auto &depthStencilImageView: m_depthStencilImageViews) {
@@ -155,23 +155,23 @@ void VulkanBase::CreateDepthStencilImageAndViews() {
 }
 
 void VulkanBase::CreateBufferingObjects() {
-    for (BufferingObjects &perFrameData: m_bufferingObjects) {
+    for (BufferingObjects &bufferingObjects: m_bufferingObjects) {
         VkFenceCreateInfo fenceCreateInfo{};
         fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
         DebugCheckCriticalVk(
-                vkCreateFence(m_device, &fenceCreateInfo, nullptr, &perFrameData.RenderFence),
+                vkCreateFence(m_device, &fenceCreateInfo, nullptr, &bufferingObjects.RenderFence),
                 "Failed to create Vulkan render fence."
         );
 
         VkSemaphoreCreateInfo semaphoreCreateInfo{};
         semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
         DebugCheckCriticalVk(
-                vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &perFrameData.PresentSemaphore),
+                vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &bufferingObjects.PresentSemaphore),
                 "Failed to create Vulkan present semaphore."
         );
         DebugCheckCriticalVk(
-                vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &perFrameData.RenderSemaphore),
+                vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &bufferingObjects.RenderSemaphore),
                 "Failed to create Vulkan render semaphore."
         );
 
@@ -180,17 +180,17 @@ void VulkanBase::CreateBufferingObjects() {
         commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         commandPoolCreateInfo.queueFamilyIndex = m_graphicsQueueFamilyIndex;
         DebugCheckCriticalVk(
-                vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &perFrameData.CommandPool),
+                vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &bufferingObjects.CommandPool),
                 "Failed to create Vulkan command pool."
         );
 
         VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
         commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        commandBufferAllocateInfo.commandPool = perFrameData.CommandPool;
+        commandBufferAllocateInfo.commandPool = bufferingObjects.CommandPool;
         commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         commandBufferAllocateInfo.commandBufferCount = 1;
         DebugCheckCriticalVk(
-                vkAllocateCommandBuffers(m_device, &commandBufferAllocateInfo, &perFrameData.CommandBuffer),
+                vkAllocateCommandBuffers(m_device, &commandBufferAllocateInfo, &bufferingObjects.CommandBuffer),
                 "Failed to allocate Vulkan command buffer."
         );
     }
