@@ -20,6 +20,7 @@ GpuDevice::GpuDevice(GLFWwindow *window) {
     CreateSyncPrimitives();
     CreateSwapchain();
     CreateSwapchainImageViews();
+    CreateDepthStencilImageAndView();
 }
 
 static std::vector<const char *> GetEnabledInstanceLayers() {
@@ -383,22 +384,38 @@ void GpuDevice::CreateSwapchainImageViews() {
         createInfo.image = m_swapchainImages[i];
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         createInfo.format = m_surfaceFormat.format;
-        VkComponentMapping &components = createInfo.components;
-        components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
         VkImageSubresourceRange &subresourceRange = createInfo.subresourceRange;
         subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         subresourceRange.baseMipLevel = 0;
         subresourceRange.levelCount = 1;
         subresourceRange.baseArrayLayer = 0;
         subresourceRange.layerCount = 1;
-        DebugCheckCriticalVk(
-                vkCreateImageView(m_device, &createInfo, nullptr, &m_swapchainImageViews[i]),
-                "Failed to create Vulkan swapchain image view #{}.", i
-        );
+        m_swapchainImageViews[i] = CreateImageView(createInfo);
     }
+}
+
+void GpuDevice::CreateDepthStencilImageAndView() {
+    m_depthStencilImage = CreateImage2D(
+            m_depthStencilFormat,
+            m_swapchainExtent,
+            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            0,
+            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
+    );
+
+    VkImageViewCreateInfo imageViewCreateInfo{};
+    imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    imageViewCreateInfo.image = m_depthStencilImage.Image;
+    imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    imageViewCreateInfo.format = m_depthStencilFormat;
+    VkImageSubresourceRange &depthImageViewSubresourceRange = imageViewCreateInfo.subresourceRange;
+    depthImageViewSubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    depthImageViewSubresourceRange.baseMipLevel = 0;
+    depthImageViewSubresourceRange.levelCount = 1;
+    depthImageViewSubresourceRange.baseArrayLayer = 0;
+    depthImageViewSubresourceRange.layerCount = 1;
+
+    m_depthStencilImageView = CreateImageView(imageViewCreateInfo);
 }
 
 GpuDevice::~GpuDevice() {
@@ -407,8 +424,10 @@ GpuDevice::~GpuDevice() {
             "Failed to wait for Vulkan device when trying to cleanup."
     );
 
+    DestroyImageView(m_depthStencilImageView);
+    DestroyImage(m_depthStencilImage);
     for (auto &swapchainImageView: m_swapchainImageViews) {
-        vkDestroyImageView(m_device, swapchainImageView, nullptr);
+        DestroyImageView(swapchainImageView);
     }
     vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
     vkDestroySemaphore(m_device, m_presentSemaphore, nullptr);
@@ -493,16 +512,22 @@ GpuBuffer GpuDevice::CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, co
     return buffer;
 }
 
-GpuBuffer GpuDevice::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags bufferUsage, VmaMemoryUsage memoryUsage) {
-    VkBufferCreateInfo bufferCreateInfo{};
-    bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferCreateInfo.size = size;
-    bufferCreateInfo.usage = bufferUsage;
+GpuImage GpuDevice::CreateImage(const VkImageCreateInfo &imageCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo) {
+    GpuImage image;
+    DebugCheckCriticalVk(
+            vmaCreateImage(m_allocator, &imageCreateInfo, &allocationCreateInfo, &image.Image, &image.Allocation, nullptr),
+            "Failed to create Vulkan image."
+    );
+    return image;
+}
 
-    VmaAllocationCreateInfo allocationCreateInfo{};
-    allocationCreateInfo.usage = memoryUsage;
-
-    return CreateBuffer(bufferCreateInfo, allocationCreateInfo);
+VkImageView GpuDevice::CreateImageView(const VkImageViewCreateInfo &createInfo) {
+    VkImageView imageView = VK_NULL_HANDLE;
+    DebugCheckCriticalVk(
+            vkCreateImageView(m_device, &createInfo, nullptr, &imageView),
+            "Failed to create Vulkan image view."
+    );
+    return imageView;
 }
 
 uint32_t GpuDevice::WaitForFrame() {

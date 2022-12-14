@@ -13,6 +13,11 @@ struct GpuBuffer {
     VmaAllocation Allocation = VK_NULL_HANDLE;
 };
 
+struct GpuImage {
+    VkImage Image = VK_NULL_HANDLE;
+    VmaAllocation Allocation = VK_NULL_HANDLE;
+};
+
 class GpuDevice {
 public:
     explicit GpuDevice(GLFWwindow *window);
@@ -35,6 +40,10 @@ public:
 
     [[nodiscard]] const std::vector<VkImageView> &GetSwapchainImageViews() const { return m_swapchainImageViews; }
 
+    [[nodiscard]] const VkFormat &GetDepthStencilFormat() const { return m_depthStencilFormat; }
+
+    [[nodiscard]] const VkImageView &GetDepthStencilImageView() const { return m_depthStencilImageView; }
+
     VkCommandPool CreateCommandPool(const VkCommandPoolCreateInfo &createInfo);
 
     VkCommandBuffer AllocateCommandBuffer(const VkCommandBufferAllocateInfo &allocateInfo);
@@ -51,7 +60,51 @@ public:
 
     GpuBuffer CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo);
 
-    GpuBuffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags bufferUsage, VmaMemoryUsage memoryUsage);
+    GpuBuffer CreateBuffer(
+            VkDeviceSize size,
+            VkBufferUsageFlags bufferUsage,
+            VmaAllocationCreateFlags flags,
+            VmaMemoryUsage memoryUsage
+    ) {
+        VkBufferCreateInfo bufferCreateInfo{};
+        bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferCreateInfo.size = size;
+        bufferCreateInfo.usage = bufferUsage;
+
+        VmaAllocationCreateInfo allocationCreateInfo{};
+        allocationCreateInfo.flags = flags;
+        allocationCreateInfo.usage = memoryUsage;
+
+        return CreateBuffer(bufferCreateInfo, allocationCreateInfo);
+    }
+
+    GpuImage CreateImage(const VkImageCreateInfo &imageCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo);
+
+    GpuImage CreateImage2D(
+            VkFormat format,
+            const VkExtent2D &extent,
+            VkImageUsageFlags imageUsage,
+            VmaAllocationCreateFlags flags,
+            VmaMemoryUsage memoryUsage
+    ) {
+        VkImageCreateInfo imageCreateInfo{};
+        imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageCreateInfo.format = format;
+        imageCreateInfo.extent = {extent.width, extent.width, 1};
+        imageCreateInfo.mipLevels = 1;
+        imageCreateInfo.arrayLayers = 1;
+        imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageCreateInfo.usage = imageUsage;
+
+        VmaAllocationCreateInfo allocationCreateInfo{};
+        allocationCreateInfo.flags = flags;
+        allocationCreateInfo.usage = memoryUsage;
+
+        return CreateImage(imageCreateInfo, allocationCreateInfo);
+    }
+
+    VkImageView CreateImageView(const VkImageViewCreateInfo &createInfo);
 
     void DestroyCommandPool(VkCommandPool commandPool) { vkDestroyCommandPool(m_device, commandPool, nullptr); }
 
@@ -66,6 +119,10 @@ public:
     void DestroyPipeline(VkPipeline pipeline) { vkDestroyPipeline(m_device, pipeline, nullptr); }
 
     void DestroyBuffer(GpuBuffer buffer) { vmaDestroyBuffer(m_allocator, buffer.Buffer, buffer.Allocation); }
+
+    void DestroyImage(GpuImage image) { vmaDestroyImage(m_allocator, image.Image, image.Allocation); }
+
+    void DestroyImageView(VkImageView imageView) { vkDestroyImageView(m_device, imageView, nullptr); }
 
     VkResult WaitIdle() { return vkDeviceWaitIdle(m_device); }
 
@@ -96,6 +153,8 @@ private:
 
     void CreateSwapchainImageViews();
 
+    void CreateDepthStencilImageAndView();
+
     GLFWwindow *m_window = nullptr;
 
     VkInstance m_instance = VK_NULL_HANDLE;
@@ -120,6 +179,10 @@ private:
     VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
     std::vector<VkImage> m_swapchainImages;
     std::vector<VkImageView> m_swapchainImageViews;
+
+    VkFormat m_depthStencilFormat = VK_FORMAT_D32_SFLOAT;
+    GpuImage m_depthStencilImage;
+    VkImageView m_depthStencilImageView = VK_NULL_HANDLE;
 
     VmaAllocator m_allocator = VK_NULL_HANDLE;
 };
