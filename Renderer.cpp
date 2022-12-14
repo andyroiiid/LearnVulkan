@@ -81,41 +81,19 @@ void Renderer::CreateRenderPass() {
     subpass.pColorAttachments = &colorAttachmentRef;
     subpass.pDepthStencilAttachment = &depthStencilAttachmentRef;
 
-    VkSubpassDependency dependencies[2];
-
-    VkSubpassDependency &colorDependency = dependencies[0];
-    colorDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    colorDependency.dstSubpass = 0;
-    colorDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    colorDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    colorDependency.srcAccessMask = 0;
-    colorDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    colorDependency.dependencyFlags = 0;
-
-    VkSubpassDependency &depthStencilDependency = dependencies[1];
-    depthStencilDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    depthStencilDependency.dstSubpass = 0;
-    depthStencilDependency.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    depthStencilDependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    depthStencilDependency.srcAccessMask = 0;
-    depthStencilDependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    depthStencilDependency.dependencyFlags = 0;
-
     VkRenderPassCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     createInfo.attachmentCount = 2;
     createInfo.pAttachments = attachments;
     createInfo.subpassCount = 1;
     createInfo.pSubpasses = &subpass;
-    createInfo.dependencyCount = 2;
-    createInfo.pDependencies = dependencies;
 
     m_renderPass = m_device->CreateRenderPass(createInfo);
 }
 
 void Renderer::CreateFramebuffers() {
     const std::vector<VkImageView> &swapchainImageViews = m_device->GetSwapchainImageViews();
-    const VkImageView &depthStencilImageView = m_device->GetDepthStencilImageView();
+    const std::vector<VkImageView> &depthStencilImageViews = m_device->GetDepthStencilImageViews();
     const VkExtent2D &swapchainExtent = m_device->GetSwapchainExtent();
     size_t numImages = swapchainImageViews.size();
     m_framebuffers.resize(numImages);
@@ -125,7 +103,7 @@ void Renderer::CreateFramebuffers() {
         createInfo.renderPass = m_renderPass;
         VkImageView attachments[2]{
                 swapchainImageViews[i],
-                depthStencilImageView
+                depthStencilImageViews[i]
         };
         createInfo.attachmentCount = 2;
         createInfo.pAttachments = attachments;

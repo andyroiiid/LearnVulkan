@@ -42,7 +42,7 @@ public:
 
     [[nodiscard]] const VkFormat &GetDepthStencilFormat() const { return m_depthStencilFormat; }
 
-    [[nodiscard]] const VkImageView &GetDepthStencilImageView() const { return m_depthStencilImageView; }
+    [[nodiscard]] const std::vector<VkImageView> &GetDepthStencilImageViews() const { return m_depthStencilImageViews; }
 
     VkCommandPool CreateCommandPool(const VkCommandPoolCreateInfo &createInfo);
 
@@ -153,7 +153,7 @@ private:
 
     void CreateSwapchainImageViews();
 
-    void CreateDepthStencilImageAndView();
+    void CreateDepthStencilImageAndViews();
 
     GLFWwindow *m_window = nullptr;
 
@@ -171,6 +171,8 @@ private:
     VkQueue m_graphicsQueue = VK_NULL_HANDLE;
     VkQueue m_presentQueue = VK_NULL_HANDLE;
 
+    VmaAllocator m_allocator = VK_NULL_HANDLE;
+
     VkFence m_renderFence = VK_NULL_HANDLE;
     VkSemaphore m_presentSemaphore = VK_NULL_HANDLE;
     VkSemaphore m_renderSemaphore = VK_NULL_HANDLE;
@@ -181,8 +183,6 @@ private:
     std::vector<VkImageView> m_swapchainImageViews;
 
     VkFormat m_depthStencilFormat = VK_FORMAT_D32_SFLOAT;
-    GpuImage m_depthStencilImage;
-    VkImageView m_depthStencilImageView = VK_NULL_HANDLE;
-
-    VmaAllocator m_allocator = VK_NULL_HANDLE;
+    std::vector<GpuImage> m_depthStencilImages;
+    std::vector<VkImageView> m_depthStencilImageViews;
 };

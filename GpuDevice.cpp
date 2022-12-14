@@ -20,7 +20,7 @@ GpuDevice::GpuDevice(GLFWwindow *window) {
     CreateSyncPrimitives();
     CreateSwapchain();
     CreateSwapchainImageViews();
-    CreateDepthStencilImageAndView();
+    CreateDepthStencilImageAndViews();
 }
 
 static std::vector<const char *> GetEnabledInstanceLayers() {
@@ -394,28 +394,31 @@ void GpuDevice::CreateSwapchainImageViews() {
     }
 }
 
-void GpuDevice::CreateDepthStencilImageAndView() {
-    m_depthStencilImage = CreateImage2D(
-            m_depthStencilFormat,
-            m_swapchainExtent,
-            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            0,
-            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
-    );
-
-    VkImageViewCreateInfo imageViewCreateInfo{};
-    imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    imageViewCreateInfo.image = m_depthStencilImage.Image;
-    imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    imageViewCreateInfo.format = m_depthStencilFormat;
-    VkImageSubresourceRange &depthImageViewSubresourceRange = imageViewCreateInfo.subresourceRange;
-    depthImageViewSubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    depthImageViewSubresourceRange.baseMipLevel = 0;
-    depthImageViewSubresourceRange.levelCount = 1;
-    depthImageViewSubresourceRange.baseArrayLayer = 0;
-    depthImageViewSubresourceRange.layerCount = 1;
-
-    m_depthStencilImageView = CreateImageView(imageViewCreateInfo);
+void GpuDevice::CreateDepthStencilImageAndViews() {
+    size_t numImages = m_swapchainImages.size();
+    m_depthStencilImages.resize(numImages);
+    m_depthStencilImageViews.resize(numImages);
+    for (int i = 0; i < numImages; i++) {
+        m_depthStencilImages[i] = CreateImage2D(
+                m_depthStencilFormat,
+                m_swapchainExtent,
+                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                0,
+                VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
+        );
+        VkImageViewCreateInfo imageViewCreateInfo{};
+        imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        imageViewCreateInfo.image = m_depthStencilImages[i].Image;
+        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        imageViewCreateInfo.format = m_depthStencilFormat;
+        VkImageSubresourceRange &depthImageViewSubresourceRange = imageViewCreateInfo.subresourceRange;
+        depthImageViewSubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        depthImageViewSubresourceRange.baseMipLevel = 0;
+        depthImageViewSubresourceRange.levelCount = 1;
+        depthImageViewSubresourceRange.baseArrayLayer = 0;
+        depthImageViewSubresourceRange.layerCount = 1;
+        m_depthStencilImageViews[i] = CreateImageView(imageViewCreateInfo);
+    }
 }
 
 GpuDevice::~GpuDevice() {
@@ -424,8 +427,12 @@ GpuDevice::~GpuDevice() {
             "Failed to wait for Vulkan device when trying to cleanup."
     );
 
-    DestroyImageView(m_depthStencilImageView);
-    DestroyImage(m_depthStencilImage);
+    for (auto &depthStencilImageView: m_depthStencilImageViews) {
+        DestroyImageView(depthStencilImageView);
+    }
+    for (auto &depthStencilImage: m_depthStencilImages) {
+        DestroyImage(depthStencilImage);
+    }
     for (auto &swapchainImageView: m_swapchainImageViews) {
         DestroyImageView(swapchainImageView);
     }
