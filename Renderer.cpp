@@ -4,11 +4,9 @@
 
 #include "Renderer.h"
 
-#include <glm/mat4x4.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Debug.h"
-#include "ShaderCompiler.h"
 #include "VertexBase.h"
 #include "MeshUtilities.h"
 
@@ -21,9 +19,13 @@ Renderer::Renderer(GLFWwindow *window) {
 
     CreateRenderPass();
     CreateFramebuffers();
-    CreatePipelineLayout();
-    CreateShaders();
-    CreatePipeline();
+
+    VulkanPipelineCreateInfo pipelineCreateInfo{};
+    pipelineCreateInfo.PushConstantSize = sizeof(PushConstantData);
+    pipelineCreateInfo.RenderPass = m_renderPass;
+    pipelineCreateInfo.VertexInput = &VertexBase::GetPipelineVertexInputStateCreateInfo();
+    m_pipeline = std::make_unique<VulkanPipeline>(m_device.get(), pipelineCreateInfo);
+
     CreateVertexBuffer();
 }
 
@@ -99,174 +101,6 @@ void Renderer::CreateFramebuffers() {
     }
 }
 
-void Renderer::CreatePipelineLayout() {
-    VkPushConstantRange pushConstantRange;
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    pushConstantRange.offset = 0;
-    pushConstantRange.size = sizeof(PushConstantData);
-
-    VkPipelineLayoutCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    createInfo.setLayoutCount = 0;
-    createInfo.pSetLayouts = nullptr;
-    createInfo.pushConstantRangeCount = 1;
-    createInfo.pPushConstantRanges = &pushConstantRange;
-    m_pipelineLayout = m_device->CreatePipelineLayout(createInfo);
-}
-
-void Renderer::CreateShaders() {
-    ShaderCompiler shaderCompiler;
-
-    const char *vertexSource = R"GLSL(
-#version 450 core
-
-layout (location = 0) in vec3 aPosition;
-layout (location = 1) in vec3 aNormal;
-layout (location = 2) in vec2 aTexCoord;
-
-layout (location = 0) out vec4 vColor;
-
-layout (push_constant) uniform PushConstant
-{
-    mat4 uMatrix;
-};
-
-void main()
-{
-    gl_Position = uMatrix * vec4(aPosition, 1);
-    vColor = vec4(aTexCoord, 0, 1);
-}
-)GLSL";
-    const char *fragmentSource = R"GLSL(
-#version 450 core
-
-layout (location = 0) in vec4 vColor;
-
-layout (location = 0) out vec4 fColor;
-
-void main()
-{
-    fColor = vColor;
-}
-)GLSL";
-
-    std::vector<uint32_t> vertexSpirv;
-    std::vector<uint32_t> fragmentSpirv;
-
-    DebugCheckCritical(
-            shaderCompiler.Compile(EShLangVertex, vertexSource, vertexSpirv),
-            "Failed to compile vertex shader."
-    );
-    DebugCheckCritical(
-            shaderCompiler.Compile(EShLangFragment, fragmentSource, fragmentSpirv),
-            "Failed to compile fragment shader."
-    );
-
-    VkShaderModuleCreateInfo vertexShaderCreateInfo{};
-    vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    vertexShaderCreateInfo.codeSize = vertexSpirv.size() * sizeof(uint32_t);
-    vertexShaderCreateInfo.pCode = vertexSpirv.data();
-    m_vertexShader = m_device->CreateShaderModule(vertexShaderCreateInfo);
-
-    VkShaderModuleCreateInfo fragmentShaderCreateInfo{};
-    fragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    fragmentShaderCreateInfo.codeSize = fragmentSpirv.size() * sizeof(uint32_t);
-    fragmentShaderCreateInfo.pCode = fragmentSpirv.data();
-    m_fragmentShader = m_device->CreateShaderModule(fragmentShaderCreateInfo);
-}
-
-void Renderer::CreatePipeline() {
-    std::vector<std::tuple<VkShaderStageFlagBits, VkShaderModule>> shaderStages = {
-            {VK_SHADER_STAGE_VERTEX_BIT,   m_vertexShader},
-            {VK_SHADER_STAGE_FRAGMENT_BIT, m_fragmentShader}
-    };
-
-    std::vector<VkPipelineShaderStageCreateInfo> stages;
-    for (const auto &[stage, module]: shaderStages) {
-        VkPipelineShaderStageCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        createInfo.stage = stage;
-        createInfo.module = module;
-        createInfo.pName = "main";
-        stages.push_back(createInfo);
-    }
-
-    VkPipelineVertexInputStateCreateInfo vertexInputState = VertexBase::GetPipelineVertexInputStateCreateInfo();
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssemblyState{};
-    inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssemblyState.primitiveRestartEnable = VK_FALSE;
-
-    const VkExtent2D &size = m_device->GetSwapchainExtent();
-    // flipped upside down so that it's consistent with OpenGL
-    const VkViewport viewport{
-            0.0f, static_cast<float>(size.height),
-            static_cast<float>(size.width), -static_cast<float>(size.height),
-            0.0f, 1.0f
-    };
-    const VkRect2D scissor{
-            {0, 0},
-            size
-    };
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.pViewports = &viewport;
-    viewportState.scissorCount = 1;
-    viewportState.pScissors = &scissor;
-
-    VkPipelineRasterizationStateCreateInfo rasterizationState{};
-    rasterizationState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizationState.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizationState.cullMode = VK_CULL_MODE_NONE;
-    rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizationState.lineWidth = 1.0f;
-
-    VkPipelineMultisampleStateCreateInfo multisampleState{};
-    multisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisampleState.sampleShadingEnable = VK_FALSE;
-    multisampleState.minSampleShading = 1.0f;
-
-    VkPipelineDepthStencilStateCreateInfo depthStencilState{};
-    depthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencilState.depthTestEnable = VK_TRUE;
-    depthStencilState.depthWriteEnable = VK_TRUE;
-    depthStencilState.depthCompareOp = VK_COMPARE_OP_LESS;
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachmentState{};
-    colorBlendAttachmentState.blendEnable = VK_FALSE;
-    colorBlendAttachmentState.colorWriteMask =
-            VK_COLOR_COMPONENT_R_BIT |
-            VK_COLOR_COMPONENT_G_BIT |
-            VK_COLOR_COMPONENT_B_BIT |
-            VK_COLOR_COMPONENT_A_BIT;
-
-    VkPipelineColorBlendStateCreateInfo colorBlendState{};
-    colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlendState.logicOpEnable = VK_FALSE;
-    colorBlendState.logicOp = VK_LOGIC_OP_COPY;
-    colorBlendState.attachmentCount = 1;
-    colorBlendState.pAttachments = &colorBlendAttachmentState;
-
-    VkGraphicsPipelineCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    createInfo.stageCount = stages.size();
-    createInfo.pStages = stages.data();
-    createInfo.pVertexInputState = &vertexInputState;
-    createInfo.pInputAssemblyState = &inputAssemblyState;
-    createInfo.pViewportState = &viewportState;
-    createInfo.pRasterizationState = &rasterizationState;
-    createInfo.pMultisampleState = &multisampleState;
-    createInfo.pDepthStencilState = &depthStencilState;
-    createInfo.pColorBlendState = &colorBlendState;
-    createInfo.layout = m_pipelineLayout;
-    createInfo.renderPass = m_renderPass;
-    createInfo.subpass = 0;
-    m_pipeline = m_device->CreateGraphicsPipeline(createInfo);
-}
-
 void Renderer::CreateVertexBuffer() {
     std::vector<VertexBase> vertices;
     AppendBoxVertices(vertices, {-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f});
@@ -290,14 +124,15 @@ Renderer::~Renderer() {
     );
 
     m_device->DestroyBuffer(m_vertexBuffer);
-    m_device->DestroyPipeline(m_pipeline);
-    m_device->DestroyShaderModule(m_vertexShader);
-    m_device->DestroyShaderModule(m_fragmentShader);
-    m_device->DestroyPipelineLayout(m_pipelineLayout);
+
+    m_pipeline.reset();
+
     for (auto &framebuffer: m_framebuffers) {
         m_device->DestroyFramebuffer(framebuffer);
     }
     m_device->DestroyRenderPass(m_renderPass);
+
+    m_device.reset();
 }
 
 void Renderer::Frame(float deltaTime) {
@@ -323,7 +158,7 @@ void Renderer::Frame(float deltaTime) {
     renderPassBeginInfo.pClearValues = clearValues;
     vkCmdBeginRenderPass(cmd, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    m_pipeline->Bind(cmd);
     const VkExtent2D &swapchainExtent = m_device->GetSwapchainExtent();
     const glm::mat4 projection = glm::perspective(
             glm::radians(60.0f),
@@ -340,7 +175,7 @@ void Renderer::Frame(float deltaTime) {
     const PushConstantData pushConstant{
             projection * view * model
     };
-    vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstantData), &pushConstant);
+    m_pipeline->PushConstant(cmd, pushConstant);
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuffer.Buffer, &offset);
     vkCmdDraw(cmd, 36, 1, 0, 0);

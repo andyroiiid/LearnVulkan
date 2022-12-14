@@ -20,7 +20,7 @@ static inline VkPipelineVertexInputStateCreateInfo CreatePipelineVertexInputStat
     return vertexInputState;
 }
 
-VkPipelineVertexInputStateCreateInfo VertexBase::GetPipelineVertexInputStateCreateInfo() {
+const VkPipelineVertexInputStateCreateInfo &VertexBase::GetPipelineVertexInputStateCreateInfo() {
     static const std::vector<VkVertexInputBindingDescription> bindings{
             {0, sizeof(VertexBase), VK_VERTEX_INPUT_RATE_VERTEX}
     };
@@ -31,5 +31,7 @@ VkPipelineVertexInputStateCreateInfo VertexBase::GetPipelineVertexInputStateCrea
             {2, 0, VK_FORMAT_R32G32_SFLOAT,    static_cast<uint32_t>(offsetof(VertexBase, TexCoord))}
     };
 
-    return CreatePipelineVertexInputStateCreateInfo(bindings, attributes);
+    static const VkPipelineVertexInputStateCreateInfo vertexInput = CreatePipelineVertexInputStateCreateInfo(bindings, attributes);
+
+    return vertexInput;
 }

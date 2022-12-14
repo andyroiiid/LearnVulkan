@@ -19,5 +19,5 @@ struct VertexBase {
     VertexBase(const glm::vec3 &position, const glm::vec3 &normal, const glm::vec2 &texCoord)
             : Position(position), Normal(normal), TexCoord(texCoord) {}
 
-    static VkPipelineVertexInputStateCreateInfo GetPipelineVertexInputStateCreateInfo();
+    static const VkPipelineVertexInputStateCreateInfo &GetPipelineVertexInputStateCreateInfo();
 };
