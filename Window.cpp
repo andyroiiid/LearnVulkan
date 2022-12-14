@@ -27,9 +27,12 @@ Window::~Window() {
 }
 
 void Window::MainLoop() {
+    double prevTime = glfwGetTime();
     glfwShowWindow(m_window);
     while (!glfwWindowShouldClose(m_window)) {
         glfwPollEvents();
-        m_renderer->Draw();
+        double currTime = glfwGetTime();
+        m_renderer->Frame(static_cast<float>(currTime - prevTime));
+        prevTime = currTime;
     }
 }

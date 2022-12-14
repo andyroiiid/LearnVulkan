@@ -8,14 +8,15 @@
 
 #include "Debug.h"
 
-VulkanBase::VulkanBase(GLFWwindow *window)
-        : VulkanDevice(window) {
+VulkanBase::VulkanBase(GLFWwindow *window, bool vsync, size_t numBuffering)
+        : VulkanDevice(window),
+          m_vsync(vsync),
+          m_bufferingObjects(numBuffering) {
     CreateSwapchain();
     CreateSwapchainImageViews();
     CreateDepthStencilImageAndViews();
 
-    CreateSyncPrimitives();
-    CreateCommandPoolAndBuffer();
+    CreateBufferingObjects();
 }
 
 VulkanBase::~VulkanBase() {
@@ -24,10 +25,12 @@ VulkanBase::~VulkanBase() {
             "Failed to wait for Vulkan device when trying to cleanup."
     );
 
-    vkDestroyCommandPool(m_device, m_commandPool, nullptr);
-    vkDestroySemaphore(m_device, m_presentSemaphore, nullptr);
-    vkDestroySemaphore(m_device, m_renderSemaphore, nullptr);
-    vkDestroyFence(m_device, m_renderFence, nullptr);
+    for (const BufferingObjects &perFrameData: m_bufferingObjects) {
+        vkDestroyCommandPool(m_device, perFrameData.CommandPool, nullptr);
+        vkDestroySemaphore(m_device, perFrameData.PresentSemaphore, nullptr);
+        vkDestroySemaphore(m_device, perFrameData.RenderSemaphore, nullptr);
+        vkDestroyFence(m_device, perFrameData.RenderFence, nullptr);
+    }
 
     for (auto &depthStencilImageView: m_depthStencilImageViews) {
         DestroyImageView(depthStencilImageView);
@@ -92,7 +95,7 @@ void VulkanBase::CreateSwapchain() {
     }
     createInfo.preTransform = capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode = m_presentMode;
+    createInfo.presentMode = m_vsync ? VK_PRESENT_MODE_FIFO_KHR : m_presentMode;
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = m_swapchain;
     DebugCheckCriticalVk(
@@ -151,64 +154,66 @@ void VulkanBase::CreateDepthStencilImageAndViews() {
     }
 }
 
-void VulkanBase::CreateSyncPrimitives() {
-    VkFenceCreateInfo fenceCreateInfo{};
-    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    DebugCheckCriticalVk(
-            vkCreateFence(m_device, &fenceCreateInfo, nullptr, &m_renderFence),
-            "Failed to create Vulkan render fence."
-    );
+void VulkanBase::CreateBufferingObjects() {
+    for (BufferingObjects &perFrameData: m_bufferingObjects) {
+        VkFenceCreateInfo fenceCreateInfo{};
+        fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        DebugCheckCriticalVk(
+                vkCreateFence(m_device, &fenceCreateInfo, nullptr, &perFrameData.RenderFence),
+                "Failed to create Vulkan render fence."
+        );
 
-    VkSemaphoreCreateInfo semaphoreCreateInfo{};
-    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    DebugCheckCriticalVk(
-            vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_presentSemaphore),
-            "Failed to create Vulkan present semaphore."
-    );
-    DebugCheckCriticalVk(
-            vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_renderSemaphore),
-            "Failed to create Vulkan render semaphore."
-    );
+        VkSemaphoreCreateInfo semaphoreCreateInfo{};
+        semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        DebugCheckCriticalVk(
+                vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &perFrameData.PresentSemaphore),
+                "Failed to create Vulkan present semaphore."
+        );
+        DebugCheckCriticalVk(
+                vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &perFrameData.RenderSemaphore),
+                "Failed to create Vulkan render semaphore."
+        );
+
+        VkCommandPoolCreateInfo commandPoolCreateInfo{};
+        commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        commandPoolCreateInfo.queueFamilyIndex = m_graphicsQueueFamilyIndex;
+        DebugCheckCriticalVk(
+                vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &perFrameData.CommandPool),
+                "Failed to create Vulkan command pool."
+        );
+
+        VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
+        commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        commandBufferAllocateInfo.commandPool = perFrameData.CommandPool;
+        commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        commandBufferAllocateInfo.commandBufferCount = 1;
+        DebugCheckCriticalVk(
+                vkAllocateCommandBuffers(m_device, &commandBufferAllocateInfo, &perFrameData.CommandBuffer),
+                "Failed to allocate Vulkan command buffer."
+        );
+    }
 }
 
-void VulkanBase::CreateCommandPoolAndBuffer() {
-    VkCommandPoolCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    createInfo.queueFamilyIndex = m_graphicsQueueFamilyIndex;
-    DebugCheckCriticalVk(
-            vkCreateCommandPool(m_device, &createInfo, nullptr, &m_commandPool),
-            "Failed to create Vulkan command pool."
-    );
+VulkanBase::BeginFrameInfo VulkanBase::BeginFrame() {
+    BufferingObjects &bufferingObjects = m_bufferingObjects[m_currentBufferingIndex];
 
-    VkCommandBufferAllocateInfo allocateInfo{};
-    allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocateInfo.commandPool = m_commandPool;
-    allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocateInfo.commandBufferCount = 1;
     DebugCheckCriticalVk(
-            vkAllocateCommandBuffers(m_device, &allocateInfo, &m_commandBuffer),
-            "Failed to allocate Vulkan command buffer."
-    );
-}
-
-std::tuple<uint32_t, VkCommandBuffer> VulkanBase::BeginFrame() {
-    DebugCheckCriticalVk(
-            vkWaitForFences(m_device, 1, &m_renderFence, true, 1'000'000'000),
+            vkWaitForFences(m_device, 1, &bufferingObjects.RenderFence, true, 1'000'000'000),
             "Failed to wait for Vulkan render fence."
     );
     DebugCheckCriticalVk(
-            vkResetFences(m_device, 1, &m_renderFence),
+            vkResetFences(m_device, 1, &bufferingObjects.RenderFence),
             "Failed to reset Vulkan render fence."
     );
     DebugCheckCriticalVk(
-            vkAcquireNextImageKHR(m_device, m_swapchain, 1'000'000'000, m_presentSemaphore, nullptr, &m_currentSwapchainImageIndex),
+            vkAcquireNextImageKHR(m_device, m_swapchain, 1'000'000'000, bufferingObjects.PresentSemaphore, nullptr, &m_currentSwapchainImageIndex),
             "Failed to acquire next Vulkan swapchain image."
     );
 
     DebugCheckCriticalVk(
-            vkResetCommandBuffer(m_commandBuffer, 0),
+            vkResetCommandBuffer(bufferingObjects.CommandBuffer, 0),
             "Failed to reset Vulkan command buffer."
     );
 
@@ -216,38 +221,40 @@ std::tuple<uint32_t, VkCommandBuffer> VulkanBase::BeginFrame() {
     commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     DebugCheckCriticalVk(
-            vkBeginCommandBuffer(m_commandBuffer, &commandBufferBeginInfo),
+            vkBeginCommandBuffer(bufferingObjects.CommandBuffer, &commandBufferBeginInfo),
             "Failed to begin Vulkan command buffer."
     );
 
-    return {m_currentSwapchainImageIndex, m_commandBuffer};
+    return {m_currentSwapchainImageIndex, m_currentBufferingIndex, bufferingObjects.CommandBuffer};
 }
 
 void VulkanBase::EndFrame() {
+    BufferingObjects &bufferingObjects = m_bufferingObjects[m_currentBufferingIndex];
+
     DebugCheckCriticalVk(
-            vkEndCommandBuffer(m_commandBuffer),
+            vkEndCommandBuffer(bufferingObjects.CommandBuffer),
             "Failed to end Vulkan command buffer."
     );
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &m_presentSemaphore;
+    submitInfo.pWaitSemaphores = &bufferingObjects.PresentSemaphore;
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     submitInfo.pWaitDstStageMask = &waitStage;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &m_commandBuffer;
+    submitInfo.pCommandBuffers = &bufferingObjects.CommandBuffer;
     submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &m_renderSemaphore;
+    submitInfo.pSignalSemaphores = &bufferingObjects.RenderSemaphore;
     DebugCheckCriticalVk(
-            vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_renderFence),
+            vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, bufferingObjects.RenderFence),
             "Failed to submit Vulkan command buffer."
     );
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &m_renderSemaphore;
+    presentInfo.pWaitSemaphores = &bufferingObjects.RenderSemaphore;
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &m_swapchain;
     presentInfo.pImageIndices = &m_currentSwapchainImageIndex;
@@ -255,4 +262,7 @@ void VulkanBase::EndFrame() {
             vkQueuePresentKHR(m_graphicsQueue, &presentInfo),
             "Failed to present Vulkan swapchain image."
     );
+
+    m_currentFrameCount++;
+    m_currentBufferingIndex = m_currentFrameCount % m_bufferingObjects.size();
 }

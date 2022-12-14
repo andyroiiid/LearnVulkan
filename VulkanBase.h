@@ -8,7 +8,7 @@
 
 class VulkanBase : public VulkanDevice {
 public:
-    explicit VulkanBase(GLFWwindow *window);
+    explicit VulkanBase(GLFWwindow *window, bool vsync = true, size_t numBuffering = 2);
 
     ~VulkanBase();
 
@@ -28,7 +28,13 @@ public:
 
     [[nodiscard]] const std::vector<VkImageView> &GetDepthStencilImageViews() const { return m_depthStencilImageViews; }
 
-    std::tuple<uint32_t, VkCommandBuffer> BeginFrame();
+    struct BeginFrameInfo {
+        [[maybe_unused]] uint32_t SwapchainImageIndex;
+        [[maybe_unused]] uint32_t BufferingIndex;
+        [[maybe_unused]] VkCommandBuffer CommandBuffer;
+    };
+
+    BeginFrameInfo BeginFrame();
 
     void EndFrame();
 
@@ -39,9 +45,9 @@ private:
 
     void CreateDepthStencilImageAndViews();
 
-    void CreateSyncPrimitives();
+    void CreateBufferingObjects();
 
-    void CreateCommandPoolAndBuffer();
+    bool m_vsync = true;
 
     VkExtent2D m_swapchainExtent{};
     VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
@@ -53,11 +59,17 @@ private:
     std::vector<VkImageView> m_depthStencilImageViews;
 
     uint32_t m_currentSwapchainImageIndex = 0;
+    uint32_t m_currentFrameCount = 0;
+    uint32_t m_currentBufferingIndex = 0;
 
-    VkFence m_renderFence = VK_NULL_HANDLE;
-    VkSemaphore m_presentSemaphore = VK_NULL_HANDLE;
-    VkSemaphore m_renderSemaphore = VK_NULL_HANDLE;
+    struct BufferingObjects {
+        VkFence RenderFence = VK_NULL_HANDLE;
+        VkSemaphore PresentSemaphore = VK_NULL_HANDLE;
+        VkSemaphore RenderSemaphore = VK_NULL_HANDLE;
 
-    VkCommandPool m_commandPool = VK_NULL_HANDLE;
-    VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
+        VkCommandPool CommandPool = VK_NULL_HANDLE;
+        VkCommandBuffer CommandBuffer = VK_NULL_HANDLE;
+    };
+
+    std::vector<BufferingObjects> m_bufferingObjects;
 };

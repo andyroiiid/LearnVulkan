@@ -22,7 +22,7 @@ public:
 
     Renderer &operator=(Renderer &&) = delete;
 
-    void Draw();
+    void Frame(float deltaTime);
 
 private:
     void CreateRenderPass();
@@ -50,4 +50,6 @@ private:
     VkPipeline m_pipeline = VK_NULL_HANDLE;
 
     VulkanBuffer m_vertexBuffer;
+
+    float m_rotation = 0.0f;
 };

@@ -300,8 +300,10 @@ Renderer::~Renderer() {
     m_device->DestroyRenderPass(m_renderPass);
 }
 
-void Renderer::Draw() {
-    auto [swapchainImageIndex, cmd] = m_device->BeginFrame();
+void Renderer::Frame(float deltaTime) {
+    m_rotation += glm::radians(deltaTime * 90.0f);
+
+    auto [swapchainImageIndex, bufferingIndex, cmd] = m_device->BeginFrame();
 
     VkClearValue clearValues[2];
     VkClearColorValue &clearColor = clearValues[0].color;
@@ -334,7 +336,7 @@ void Renderer::Draw() {
             glm::vec3(0.0f, 0.0f, 0.0f),
             glm::vec3(0.0f, 1.0f, 0.0f)
     );
-    const glm::mat4 model = glm::mat4(1.0f);
+    const glm::mat4 model = glm::rotate(glm::mat4(1.0f), m_rotation, glm::vec3(0.0f, 1.0f, 0.0f));
     const PushConstantData pushConstant{
             projection * view * model
     };
