@@ -8,29 +8,29 @@
 #include <GLFW/glfw3.h>
 #include <vk_mem_alloc.h>
 
-struct GpuBuffer {
+struct VulkanBuffer {
     VkBuffer Buffer = VK_NULL_HANDLE;
     VmaAllocation Allocation = VK_NULL_HANDLE;
 };
 
-struct GpuImage {
+struct VulkanImage {
     VkImage Image = VK_NULL_HANDLE;
     VmaAllocation Allocation = VK_NULL_HANDLE;
 };
 
-class GpuDevice {
+class VulkanDevice {
 public:
-    explicit GpuDevice(GLFWwindow *window);
+    explicit VulkanDevice(GLFWwindow *window);
 
-    ~GpuDevice();
+    ~VulkanDevice();
 
-    GpuDevice(const GpuDevice &) = delete;
+    VulkanDevice(const VulkanDevice &) = delete;
 
-    GpuDevice &operator=(const GpuDevice &) = delete;
+    VulkanDevice &operator=(const VulkanDevice &) = delete;
 
-    GpuDevice(GpuDevice &&) = delete;
+    VulkanDevice(VulkanDevice &&) = delete;
 
-    GpuDevice &operator=(GpuDevice &&) = delete;
+    VulkanDevice &operator=(VulkanDevice &&) = delete;
 
     [[nodiscard]] const VkSurfaceFormatKHR &GetSurfaceFormat() const { return m_surfaceFormat; }
 
@@ -52,9 +52,9 @@ public:
 
     VkPipeline CreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo &createInfo);
 
-    GpuBuffer CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo);
+    VulkanBuffer CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo);
 
-    GpuBuffer CreateBuffer(
+    VulkanBuffer CreateBuffer(
             VkDeviceSize size,
             VkBufferUsageFlags bufferUsage,
             VmaAllocationCreateFlags flags,
@@ -72,9 +72,9 @@ public:
         return CreateBuffer(bufferCreateInfo, allocationCreateInfo);
     }
 
-    GpuImage CreateImage(const VkImageCreateInfo &imageCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo);
+    VulkanImage CreateImage(const VkImageCreateInfo &imageCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo);
 
-    GpuImage CreateImage2D(
+    VulkanImage CreateImage2D(
             VkFormat format,
             const VkExtent2D &extent,
             VkImageUsageFlags imageUsage,
@@ -110,9 +110,9 @@ public:
 
     void DestroyPipeline(VkPipeline pipeline) { vkDestroyPipeline(m_device, pipeline, nullptr); }
 
-    void DestroyBuffer(GpuBuffer buffer) { vmaDestroyBuffer(m_allocator, buffer.Buffer, buffer.Allocation); }
+    void DestroyBuffer(VulkanBuffer buffer) { vmaDestroyBuffer(m_allocator, buffer.Buffer, buffer.Allocation); }
 
-    void DestroyImage(GpuImage image) { vmaDestroyImage(m_allocator, image.Image, image.Allocation); }
+    void DestroyImage(VulkanImage image) { vmaDestroyImage(m_allocator, image.Image, image.Allocation); }
 
     void DestroyImageView(VkImageView imageView) { vkDestroyImageView(m_device, imageView, nullptr); }
 
@@ -173,7 +173,7 @@ private:
     std::vector<VkImageView> m_swapchainImageViews;
 
     VkFormat m_depthStencilFormat = VK_FORMAT_D32_SFLOAT;
-    std::vector<GpuImage> m_depthStencilImages;
+    std::vector<VulkanImage> m_depthStencilImages;
     std::vector<VkImageView> m_depthStencilImageViews;
 
     uint32_t m_currentSwapchainImageIndex = 0;

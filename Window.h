@@ -7,7 +7,7 @@
 #include <memory>
 #include <GLFW/glfw3.h>
 
-#include "GpuDevice.h"
+#include "VulkanDevice.h"
 #include "Renderer.h"
 
 class Window {
@@ -29,6 +29,6 @@ public:
 private:
     GLFWwindow *m_window = nullptr;
 
-    std::unique_ptr<GpuDevice> m_gpu;
+    std::unique_ptr<VulkanDevice> m_gpu;
     std::unique_ptr<Renderer> m_renderer;
 };

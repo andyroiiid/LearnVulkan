@@ -4,11 +4,11 @@
 
 #pragma once
 
-#include "GpuDevice.h"
+#include "VulkanDevice.h"
 
 class Renderer {
 public:
-    explicit Renderer(GpuDevice *device);
+    explicit Renderer(VulkanDevice *device);
 
     ~Renderer();
 
@@ -35,7 +35,7 @@ private:
 
     void CreateVertexBuffer();
 
-    GpuDevice *m_device = nullptr;
+    VulkanDevice *m_device = nullptr;
 
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> m_framebuffers;
@@ -47,5 +47,5 @@ private:
 
     VkPipeline m_pipeline = VK_NULL_HANDLE;
 
-    GpuBuffer m_vertexBuffer;
+    VulkanBuffer m_vertexBuffer;
 };

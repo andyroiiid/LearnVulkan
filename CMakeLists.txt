@@ -28,7 +28,7 @@ add_executable(LearnVulkan
         Debug.h
         Window.cpp Window.h
         vk_mem_alloc.cpp
-        GpuDevice.cpp GpuDevice.h
+        VulkanDevice.cpp VulkanDevice.h
         ShaderCompiler.cpp ShaderCompiler.h
         VertexBase.cpp VertexBase.h
         MeshUtilities.cpp MeshUtilities.h

@@ -2,14 +2,14 @@
 // Created by andyroiiid on 12/12/2022.
 //
 
-#include "GpuDevice.h"
+#include "VulkanDevice.h"
 
 #include <set>
 #include <algorithm>
 
 #include "Debug.h"
 
-GpuDevice::GpuDevice(GLFWwindow *window) {
+VulkanDevice::VulkanDevice(GLFWwindow *window) {
     m_window = window;
     CreateInstance();
     CreateDebugMessenger();
@@ -40,7 +40,7 @@ static std::vector<const char *> GetEnabledInstanceExtensions() {
     return extensions;
 }
 
-void GpuDevice::CreateInstance() {
+void VulkanDevice::CreateInstance() {
     VkApplicationInfo applicationInfo{};
     applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     applicationInfo.pApplicationName = "Learn Vulkan";
@@ -106,7 +106,7 @@ static VKAPI_ATTR void VKAPI_CALL vkDestroyDebugUtilsMessengerEXT(
     return proc(instance, messenger, pAllocator);
 }
 
-void GpuDevice::CreateDebugMessenger() {
+void VulkanDevice::CreateDebugMessenger() {
     VkDebugUtilsMessengerCreateInfoEXT createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     createInfo.messageSeverity =
@@ -126,7 +126,7 @@ void GpuDevice::CreateDebugMessenger() {
     );
 }
 
-void GpuDevice::CreateSurface() {
+void VulkanDevice::CreateSurface() {
     DebugCheckCriticalVk(
             glfwCreateWindowSurface(m_instance, m_window, nullptr, &m_surface),
             "Failed to create Vulkan surface."
@@ -204,7 +204,7 @@ static VkPresentModeKHR PickPresentMode(const std::vector<VkPresentModeKHR> &pre
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-void GpuDevice::SelectPhysicalDeviceAndQueueFamilyIndices() {
+void VulkanDevice::SelectPhysicalDeviceAndQueueFamilyIndices() {
     std::vector<VkPhysicalDevice> devices = EnumeratePhysicalDevices(m_instance);
     for (const VkPhysicalDevice &device: devices) {
         VkPhysicalDeviceProperties deviceProperties;
@@ -257,7 +257,7 @@ static std::vector<const char *> GetEnabledDeviceExtensions() {
     };
 }
 
-void GpuDevice::CreateDevice() {
+void VulkanDevice::CreateDevice() {
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> queueFamilyIndices = {m_graphicsQueueFamilyIndex, m_presentQueueFamilyIndex};
     float queuePriority = 1.0f;
@@ -290,7 +290,7 @@ void GpuDevice::CreateDevice() {
     vkGetDeviceQueue(m_device, m_presentQueueFamilyIndex, 0, &m_presentQueue);
 }
 
-void GpuDevice::CreateAllocator() {
+void VulkanDevice::CreateAllocator() {
     VmaAllocatorCreateInfo createInfo{};
     createInfo.physicalDevice = m_physicalDevice;
     createInfo.device = m_device;
@@ -317,7 +317,7 @@ static VkExtent2D CalcSwapchainExtent(const VkSurfaceCapabilitiesKHR &capabiliti
     return capabilities.currentExtent;
 }
 
-void GpuDevice::CreateSwapchain() {
+void VulkanDevice::CreateSwapchain() {
     VkSurfaceCapabilitiesKHR capabilities;
     DebugCheckCriticalVk(
             vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &capabilities),
@@ -366,7 +366,7 @@ void GpuDevice::CreateSwapchain() {
     vkGetSwapchainImagesKHR(m_device, m_swapchain, &imageCount, m_swapchainImages.data());
 }
 
-void GpuDevice::CreateSwapchainImageViews() {
+void VulkanDevice::CreateSwapchainImageViews() {
     size_t numImages = m_swapchainImages.size();
     m_swapchainImageViews.resize(numImages);
     for (int i = 0; i < numImages; i++) {
@@ -385,7 +385,7 @@ void GpuDevice::CreateSwapchainImageViews() {
     }
 }
 
-void GpuDevice::CreateDepthStencilImageAndViews() {
+void VulkanDevice::CreateDepthStencilImageAndViews() {
     size_t numImages = m_swapchainImages.size();
     m_depthStencilImages.resize(numImages);
     m_depthStencilImageViews.resize(numImages);
@@ -412,7 +412,7 @@ void GpuDevice::CreateDepthStencilImageAndViews() {
     }
 }
 
-void GpuDevice::CreateSyncPrimitives() {
+void VulkanDevice::CreateSyncPrimitives() {
     VkFenceCreateInfo fenceCreateInfo{};
     fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -433,7 +433,7 @@ void GpuDevice::CreateSyncPrimitives() {
     );
 }
 
-void GpuDevice::CreateCommandPoolAndBuffer() {
+void VulkanDevice::CreateCommandPoolAndBuffer() {
     VkCommandPoolCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     createInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -454,7 +454,7 @@ void GpuDevice::CreateCommandPoolAndBuffer() {
     );
 }
 
-GpuDevice::~GpuDevice() {
+VulkanDevice::~VulkanDevice() {
     DebugCheckCriticalVk(
             WaitIdle(),
             "Failed to wait for Vulkan device when trying to cleanup."
@@ -483,7 +483,7 @@ GpuDevice::~GpuDevice() {
     vkDestroyInstance(m_instance, nullptr);
 }
 
-VkRenderPass GpuDevice::CreateRenderPass(const VkRenderPassCreateInfo &createInfo) {
+VkRenderPass VulkanDevice::CreateRenderPass(const VkRenderPassCreateInfo &createInfo) {
     VkRenderPass renderPass = VK_NULL_HANDLE;
     DebugCheckCriticalVk(
             vkCreateRenderPass(m_device, &createInfo, nullptr, &renderPass),
@@ -492,7 +492,7 @@ VkRenderPass GpuDevice::CreateRenderPass(const VkRenderPassCreateInfo &createInf
     return renderPass;
 }
 
-VkFramebuffer GpuDevice::CreateFramebuffer(const VkFramebufferCreateInfo &createInfo) {
+VkFramebuffer VulkanDevice::CreateFramebuffer(const VkFramebufferCreateInfo &createInfo) {
     VkFramebuffer framebuffer = VK_NULL_HANDLE;
     DebugCheckCriticalVk(
             vkCreateFramebuffer(m_device, &createInfo, nullptr, &framebuffer),
@@ -501,7 +501,7 @@ VkFramebuffer GpuDevice::CreateFramebuffer(const VkFramebufferCreateInfo &create
     return framebuffer;
 }
 
-VkShaderModule GpuDevice::CreateShaderModule(const VkShaderModuleCreateInfo &createInfo) {
+VkShaderModule VulkanDevice::CreateShaderModule(const VkShaderModuleCreateInfo &createInfo) {
     VkShaderModule shaderModule = VK_NULL_HANDLE;
     DebugCheckCriticalVk(
             vkCreateShaderModule(m_device, &createInfo, nullptr, &shaderModule),
@@ -510,7 +510,7 @@ VkShaderModule GpuDevice::CreateShaderModule(const VkShaderModuleCreateInfo &cre
     return shaderModule;
 }
 
-VkPipelineLayout GpuDevice::CreatePipelineLayout(const VkPipelineLayoutCreateInfo &createInfo) {
+VkPipelineLayout VulkanDevice::CreatePipelineLayout(const VkPipelineLayoutCreateInfo &createInfo) {
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     DebugCheckCriticalVk(
             vkCreatePipelineLayout(m_device, &createInfo, nullptr, &pipelineLayout),
@@ -519,7 +519,7 @@ VkPipelineLayout GpuDevice::CreatePipelineLayout(const VkPipelineLayoutCreateInf
     return pipelineLayout;
 }
 
-VkPipeline GpuDevice::CreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo &createInfo) {
+VkPipeline VulkanDevice::CreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo &createInfo) {
     VkPipeline pipeline = VK_NULL_HANDLE;
     DebugCheckCriticalVk(
             vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &pipeline),
@@ -528,8 +528,8 @@ VkPipeline GpuDevice::CreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo 
     return pipeline;
 }
 
-GpuBuffer GpuDevice::CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo) {
-    GpuBuffer buffer;
+VulkanBuffer VulkanDevice::CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo) {
+    VulkanBuffer buffer;
     DebugCheckCriticalVk(
             vmaCreateBuffer(m_allocator, &bufferCreateInfo, &allocationCreateInfo, &buffer.Buffer, &buffer.Allocation, nullptr),
             "Failed to create Vulkan buffer."
@@ -537,8 +537,8 @@ GpuBuffer GpuDevice::CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, co
     return buffer;
 }
 
-GpuImage GpuDevice::CreateImage(const VkImageCreateInfo &imageCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo) {
-    GpuImage image;
+VulkanImage VulkanDevice::CreateImage(const VkImageCreateInfo &imageCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo) {
+    VulkanImage image;
     DebugCheckCriticalVk(
             vmaCreateImage(m_allocator, &imageCreateInfo, &allocationCreateInfo, &image.Image, &image.Allocation, nullptr),
             "Failed to create Vulkan image."
@@ -546,7 +546,7 @@ GpuImage GpuDevice::CreateImage(const VkImageCreateInfo &imageCreateInfo, const 
     return image;
 }
 
-VkImageView GpuDevice::CreateImageView(const VkImageViewCreateInfo &createInfo) {
+VkImageView VulkanDevice::CreateImageView(const VkImageViewCreateInfo &createInfo) {
     VkImageView imageView = VK_NULL_HANDLE;
     DebugCheckCriticalVk(
             vkCreateImageView(m_device, &createInfo, nullptr, &imageView),
@@ -555,7 +555,7 @@ VkImageView GpuDevice::CreateImageView(const VkImageViewCreateInfo &createInfo) 
     return imageView;
 }
 
-std::tuple<uint32_t, VkCommandBuffer> GpuDevice::BeginFrame() {
+std::tuple<uint32_t, VkCommandBuffer> VulkanDevice::BeginFrame() {
     DebugCheckCriticalVk(
             vkWaitForFences(m_device, 1, &m_renderFence, true, 1'000'000'000),
             "Failed to wait for Vulkan render fence."
@@ -585,7 +585,7 @@ std::tuple<uint32_t, VkCommandBuffer> GpuDevice::BeginFrame() {
     return {m_currentSwapchainImageIndex, m_commandBuffer};
 }
 
-void GpuDevice::EndFrame() {
+void VulkanDevice::EndFrame() {
     DebugCheckCriticalVk(
             vkEndCommandBuffer(m_commandBuffer),
             "Failed to end Vulkan command buffer."
@@ -619,7 +619,7 @@ void GpuDevice::EndFrame() {
     );
 }
 
-void *GpuDevice::MapMemory(VmaAllocation allocation) {
+void *VulkanDevice::MapMemory(VmaAllocation allocation) {
     void *data = nullptr;
     DebugCheckCriticalVk(
             vmaMapMemory(m_allocator, allocation, &data),
@@ -628,6 +628,6 @@ void *GpuDevice::MapMemory(VmaAllocation allocation) {
     return data;
 }
 
-void GpuDevice::UnmapMemory(VmaAllocation allocation) {
+void VulkanDevice::UnmapMemory(VmaAllocation allocation) {
     vmaUnmapMemory(m_allocator, allocation);
 }

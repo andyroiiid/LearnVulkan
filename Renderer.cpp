@@ -16,7 +16,7 @@ struct PushConstantData {
     glm::mat4 Matrix;
 };
 
-Renderer::Renderer(GpuDevice *device)
+Renderer::Renderer(VulkanDevice *device)
         : m_device(device) {
     CreateRenderPass();
     CreateFramebuffers();
