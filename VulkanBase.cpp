@@ -19,31 +19,6 @@ VulkanBase::VulkanBase(GLFWwindow *window, bool vsync, size_t numBuffering)
     CreateBufferingObjects();
 }
 
-VulkanBase::~VulkanBase() {
-    DebugCheckCriticalVk(
-            WaitIdle(),
-            "Failed to wait for Vulkan device when trying to cleanup."
-    );
-
-    for (const BufferingObjects &bufferingObjects: m_bufferingObjects) {
-        vkDestroyCommandPool(m_device, bufferingObjects.CommandPool, nullptr);
-        vkDestroySemaphore(m_device, bufferingObjects.PresentSemaphore, nullptr);
-        vkDestroySemaphore(m_device, bufferingObjects.RenderSemaphore, nullptr);
-        vkDestroyFence(m_device, bufferingObjects.RenderFence, nullptr);
-    }
-
-    for (auto &depthStencilImageView: m_depthStencilImageViews) {
-        DestroyImageView(depthStencilImageView);
-    }
-    for (auto &depthStencilImage: m_depthStencilImages) {
-        DestroyImage(depthStencilImage);
-    }
-    for (auto &swapchainImageView: m_swapchainImageViews) {
-        DestroyImageView(swapchainImageView);
-    }
-    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
-}
-
 static VkExtent2D CalcSwapchainExtent(const VkSurfaceCapabilitiesKHR &capabilities, GLFWwindow *window) {
     if (capabilities.currentExtent.width == std::numeric_limits<uint32_t>::max() &&
         capabilities.currentExtent.height == std::numeric_limits<uint32_t>::max()) {
@@ -194,6 +169,31 @@ void VulkanBase::CreateBufferingObjects() {
                 "Failed to allocate Vulkan command buffer."
         );
     }
+}
+
+VulkanBase::~VulkanBase() {
+    DebugCheckCriticalVk(
+            WaitIdle(),
+            "Failed to wait for Vulkan device when trying to cleanup."
+    );
+
+    for (const BufferingObjects &bufferingObjects: m_bufferingObjects) {
+        vkDestroyCommandPool(m_device, bufferingObjects.CommandPool, nullptr);
+        vkDestroySemaphore(m_device, bufferingObjects.PresentSemaphore, nullptr);
+        vkDestroySemaphore(m_device, bufferingObjects.RenderSemaphore, nullptr);
+        vkDestroyFence(m_device, bufferingObjects.RenderFence, nullptr);
+    }
+
+    for (auto &depthStencilImageView: m_depthStencilImageViews) {
+        DestroyImageView(depthStencilImageView);
+    }
+    for (auto &depthStencilImage: m_depthStencilImages) {
+        DestroyImage(depthStencilImage);
+    }
+    for (auto &swapchainImageView: m_swapchainImageViews) {
+        DestroyImageView(swapchainImageView);
+    }
+    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
 }
 
 VulkanBase::BeginFrameInfo VulkanBase::BeginFrame() {
