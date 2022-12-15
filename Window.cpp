@@ -12,9 +12,9 @@ Window::Window() {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-    GLFWmonitor *primaryMonitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode *videoMode = glfwGetVideoMode(primaryMonitor);
-    m_window = glfwCreateWindow(videoMode->width, videoMode->height, "Learn Vulkan", primaryMonitor, nullptr);
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    const GLFWvidmode *videoMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+    m_window = glfwCreateWindow(videoMode->width, videoMode->height, "Learn Vulkan", nullptr, nullptr);
     DebugCheckCritical(m_window != nullptr, "Failed to create GLFW window.");
 
     glfwSetWindowUserPointer(m_window, this);

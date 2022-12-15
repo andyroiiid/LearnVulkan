@@ -182,7 +182,7 @@ static std::vector<VkPresentModeKHR> GetPresentModes(VkPhysicalDevice device, Vk
 
 static VkSurfaceFormatKHR PickSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &surfaceFormats) {
     for (const VkSurfaceFormatKHR &surfaceFormat: surfaceFormats) {
-        if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_UNORM && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return surfaceFormat;
         }
     }
