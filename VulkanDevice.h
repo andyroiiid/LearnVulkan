@@ -8,10 +8,7 @@
 #include <GLFW/glfw3.h>
 #include <vk_mem_alloc.h>
 
-struct VulkanBuffer {
-    VkBuffer Buffer = VK_NULL_HANDLE;
-    VmaAllocation Allocation = VK_NULL_HANDLE;
-};
+#include "VulkanBuffer.h"
 
 struct VulkanImage {
     VkImage Image = VK_NULL_HANDLE;
@@ -44,24 +41,13 @@ public:
 
     VkPipeline CreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo &createInfo);
 
-    VulkanBuffer CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo);
-
     VulkanBuffer CreateBuffer(
             VkDeviceSize size,
             VkBufferUsageFlags bufferUsage,
             VmaAllocationCreateFlags flags,
             VmaMemoryUsage memoryUsage
     ) {
-        VkBufferCreateInfo bufferCreateInfo{};
-        bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferCreateInfo.size = size;
-        bufferCreateInfo.usage = bufferUsage;
-
-        VmaAllocationCreateInfo allocationCreateInfo{};
-        allocationCreateInfo.flags = flags;
-        allocationCreateInfo.usage = memoryUsage;
-
-        return CreateBuffer(bufferCreateInfo, allocationCreateInfo);
+        return {m_allocator, size, bufferUsage, flags, memoryUsage};
     }
 
     VulkanImage CreateImage(const VkImageCreateInfo &imageCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo);
@@ -102,17 +88,11 @@ public:
 
     void DestroyPipeline(VkPipeline pipeline) { vkDestroyPipeline(m_device, pipeline, nullptr); }
 
-    void DestroyBuffer(VulkanBuffer buffer) { vmaDestroyBuffer(m_allocator, buffer.Buffer, buffer.Allocation); }
-
     void DestroyImage(VulkanImage image) { vmaDestroyImage(m_allocator, image.Image, image.Allocation); }
 
     void DestroyImageView(VkImageView imageView) { vkDestroyImageView(m_device, imageView, nullptr); }
 
     VkResult WaitIdle() { return vkDeviceWaitIdle(m_device); }
-
-    void *MapMemory(VmaAllocation allocation);
-
-    void UnmapMemory(VmaAllocation allocation);
 
 protected:
     void CreateInstance();
@@ -126,6 +106,8 @@ protected:
     void CreateDevice();
 
     void CreateAllocator();
+
+    void CreateDescriptorPool();
 
     GLFWwindow *m_window = nullptr;
 
@@ -144,4 +126,6 @@ protected:
     VkQueue m_presentQueue = VK_NULL_HANDLE;
 
     VmaAllocator m_allocator = VK_NULL_HANDLE;
+
+    VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
 };

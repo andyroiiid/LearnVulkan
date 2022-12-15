@@ -154,9 +154,7 @@ void Renderer::CreateVertexBuffer() {
             VMA_MEMORY_USAGE_AUTO
     );
 
-    auto data = static_cast<VertexBase *>(m_device->MapMemory(m_vertexBuffer.Allocation));
-    memcpy(data, vertices.data(), vertices.size() * sizeof(VertexBase));
-    m_device->UnmapMemory(m_vertexBuffer.Allocation);
+    m_vertexBuffer.Upload(vertices);
 }
 
 Renderer::~Renderer() {
@@ -165,7 +163,7 @@ Renderer::~Renderer() {
             "Failed to wait for Vulkan device when trying to cleanup renderer."
     );
 
-    m_device->DestroyBuffer(m_vertexBuffer);
+    m_vertexBuffer = {};
 
     m_fillPipeline.reset();
     m_wirePipeline.reset();
@@ -220,8 +218,7 @@ void Renderer::Frame(float deltaTime) {
             projection * view * model
     };
     pipeline->PushConstant(cmd, pushConstant);
-    VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuffer.Buffer, &offset);
+    m_vertexBuffer.BindAsVertexBuffer(cmd);
     vkCmdDraw(cmd, 36, 1, 0, 0);
 
     vkCmdEndRenderPass(cmd);

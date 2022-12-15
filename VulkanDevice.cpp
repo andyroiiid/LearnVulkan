@@ -17,6 +17,7 @@ VulkanDevice::VulkanDevice(GLFWwindow *window) {
     SelectPhysicalDeviceAndQueueFamilyIndices();
     CreateDevice();
     CreateAllocator();
+    CreateDescriptorPool();
 }
 
 static std::vector<const char *> GetEnabledInstanceLayers() {
@@ -296,7 +297,36 @@ void VulkanDevice::CreateAllocator() {
     );
 }
 
+void VulkanDevice::CreateDescriptorPool() {
+    std::vector<VkDescriptorPoolSize> poolSizes{
+            {VK_DESCRIPTOR_TYPE_SAMPLER,                1024},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024},
+            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024},
+            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024},
+            {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024},
+            {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024}
+    };
+
+    VkDescriptorPoolCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    createInfo.maxSets = 1024;
+    createInfo.poolSizeCount = poolSizes.size();
+    createInfo.pPoolSizes = poolSizes.data();
+
+    DebugCheckCriticalVk(
+            vkCreateDescriptorPool(m_device, &createInfo, nullptr, &m_descriptorPool),
+            "Failed to create Vulkan descriptor pool."
+    );
+}
+
 VulkanDevice::~VulkanDevice() {
+    vkDestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
     vmaDestroyAllocator(m_allocator);
     vkDestroyDevice(m_device, nullptr);
     vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
@@ -349,15 +379,6 @@ VkPipeline VulkanDevice::CreateGraphicsPipeline(const VkGraphicsPipelineCreateIn
     return pipeline;
 }
 
-VulkanBuffer VulkanDevice::CreateBuffer(const VkBufferCreateInfo &bufferCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo) {
-    VulkanBuffer buffer;
-    DebugCheckCriticalVk(
-            vmaCreateBuffer(m_allocator, &bufferCreateInfo, &allocationCreateInfo, &buffer.Buffer, &buffer.Allocation, nullptr),
-            "Failed to create Vulkan buffer."
-    );
-    return buffer;
-}
-
 VulkanImage VulkanDevice::CreateImage(const VkImageCreateInfo &imageCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo) {
     VulkanImage image;
     DebugCheckCriticalVk(
@@ -374,17 +395,4 @@ VkImageView VulkanDevice::CreateImageView(const VkImageViewCreateInfo &createInf
             "Failed to create Vulkan image view."
     );
     return imageView;
-}
-
-void *VulkanDevice::MapMemory(VmaAllocation allocation) {
-    void *data = nullptr;
-    DebugCheckCriticalVk(
-            vmaMapMemory(m_allocator, allocation, &data),
-            "Failed to map Vulkan memory."
-    );
-    return data;
-}
-
-void VulkanDevice::UnmapMemory(VmaAllocation allocation) {
-    vmaUnmapMemory(m_allocator, allocation);
 }
