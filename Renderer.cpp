@@ -218,7 +218,8 @@ void Renderer::Frame(float deltaTime) {
             projection * view * model
     };
     pipeline->PushConstant(cmd, pushConstant);
-    m_vertexBuffer.BindAsVertexBuffer(cmd);
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuffer.Get(), &offset);
     vkCmdDraw(cmd, 36, 1, 0, 0);
 
     vkCmdEndRenderPass(cmd);

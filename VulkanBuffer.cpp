@@ -51,8 +51,3 @@ void VulkanBuffer::Upload(size_t size, const void *data) {
     memcpy(mappedMemory, data, size);
     vmaUnmapMemory(m_allocator, m_allocation);
 }
-
-void VulkanBuffer::BindAsVertexBuffer(VkCommandBuffer commandBuffer) {
-    VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, &m_buffer, &offset);
-}

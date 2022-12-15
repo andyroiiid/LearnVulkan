@@ -56,7 +56,7 @@ public:
         Upload(sizeof(T), &data);
     }
 
-    void BindAsVertexBuffer(VkCommandBuffer commandBuffer);
+    [[nodiscard]] const VkBuffer &Get() const { return m_buffer; }
 
 private:
     VmaAllocator m_allocator = VK_NULL_HANDLE;
