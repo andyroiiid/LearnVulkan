@@ -10,13 +10,12 @@
 
 VulkanBase::VulkanBase(GLFWwindow *window, bool vsync, size_t numBuffering)
         : VulkanDevice(window),
-          m_vsync(vsync),
-          m_bufferingObjects(numBuffering) {
+          m_vsync(vsync) {
     CreateSwapchain();
     CreateSwapchainImageViews();
     CreateDepthStencilImageAndViews();
 
-    CreateBufferingObjects();
+    CreateBufferingObjects(numBuffering);
 }
 
 static VkExtent2D CalcSwapchainExtent(const VkSurfaceCapabilitiesKHR &capabilities, GLFWwindow *window) {
@@ -129,7 +128,8 @@ void VulkanBase::CreateDepthStencilImageAndViews() {
     }
 }
 
-void VulkanBase::CreateBufferingObjects() {
+void VulkanBase::CreateBufferingObjects(size_t numBuffering) {
+    m_bufferingObjects.resize(numBuffering);
     for (BufferingObjects &bufferingObjects: m_bufferingObjects) {
         VkFenceCreateInfo fenceCreateInfo{};
         fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;

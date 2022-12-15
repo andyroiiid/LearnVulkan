@@ -28,6 +28,8 @@ public:
 
     [[nodiscard]] const std::vector<VkImageView> &GetDepthStencilImageViews() const { return m_depthStencilImageViews; }
 
+    [[nodiscard]] size_t GetNumBuffering() const { return m_bufferingObjects.size(); }
+
     struct BeginFrameInfo {
         [[maybe_unused]] uint32_t SwapchainImageIndex;
         [[maybe_unused]] uint32_t BufferingIndex;
@@ -45,7 +47,7 @@ private:
 
     void CreateDepthStencilImageAndViews();
 
-    void CreateBufferingObjects();
+    void CreateBufferingObjects(size_t numBuffering);
 
     bool m_vsync = true;
 
@@ -66,7 +68,6 @@ private:
         VkCommandPool CommandPool = VK_NULL_HANDLE;
         VkCommandBuffer CommandBuffer = VK_NULL_HANDLE;
     };
-
     std::vector<BufferingObjects> m_bufferingObjects;
 
     uint32_t m_currentSwapchainImageIndex = 0;

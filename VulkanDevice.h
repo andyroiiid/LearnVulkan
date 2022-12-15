@@ -29,13 +29,33 @@ public:
 
     VkRenderPass CreateRenderPass(const VkRenderPassCreateInfo &createInfo);
 
+    void DestroyRenderPass(VkRenderPass renderPass) {
+        vkDestroyRenderPass(m_device, renderPass, nullptr);
+    }
+
     VkFramebuffer CreateFramebuffer(const VkFramebufferCreateInfo &createInfo);
+
+    void DestroyFramebuffer(VkFramebuffer framebuffer) {
+        vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+    }
 
     VkShaderModule CreateShaderModule(const VkShaderModuleCreateInfo &createInfo);
 
+    void DestroyShaderModule(VkShaderModule shaderModule) {
+        vkDestroyShaderModule(m_device, shaderModule, nullptr);
+    }
+
     VkPipelineLayout CreatePipelineLayout(const VkPipelineLayoutCreateInfo &createInfo);
 
+    void DestroyPipelineLayout(VkPipelineLayout pipelineLayout) {
+        vkDestroyPipelineLayout(m_device, pipelineLayout, nullptr);
+    }
+
     VkPipeline CreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo &createInfo);
+
+    void DestroyPipeline(VkPipeline pipeline) {
+        vkDestroyPipeline(m_device, pipeline, nullptr);
+    }
 
     VulkanBuffer CreateBuffer(
             VkDeviceSize size,
@@ -58,17 +78,23 @@ public:
 
     VkImageView CreateImageView(const VkImageViewCreateInfo &createInfo);
 
-    void DestroyRenderPass(VkRenderPass renderPass) { vkDestroyRenderPass(m_device, renderPass, nullptr); }
+    void DestroyImageView(VkImageView imageView) {
+        vkDestroyImageView(m_device, imageView, nullptr);
+    }
 
-    void DestroyFramebuffer(VkFramebuffer framebuffer) { vkDestroyFramebuffer(m_device, framebuffer, nullptr); }
+    VkDescriptorSetLayout CreateDescriptorSetLayout(const VkDescriptorSetLayoutCreateInfo &createInfo);
 
-    void DestroyShaderModule(VkShaderModule shaderModule) { vkDestroyShaderModule(m_device, shaderModule, nullptr); }
+    void DestroyDescriptorSetLayout(VkDescriptorSetLayout descriptorSetLayout) {
+        vkDestroyDescriptorSetLayout(m_device, descriptorSetLayout, nullptr);
+    }
 
-    void DestroyPipelineLayout(VkPipelineLayout pipelineLayout) { vkDestroyPipelineLayout(m_device, pipelineLayout, nullptr); }
+    VkDescriptorSet AllocateDescriptorSet(VkDescriptorSetLayout descriptorSetLayout);
 
-    void DestroyPipeline(VkPipeline pipeline) { vkDestroyPipeline(m_device, pipeline, nullptr); }
+    void FreeDescriptorSet(VkDescriptorSet descriptorSet);
 
-    void DestroyImageView(VkImageView imageView) { vkDestroyImageView(m_device, imageView, nullptr); }
+    void WriteDescriptorSet(const VkWriteDescriptorSet &writeDescriptorSet) {
+        vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
+    }
 
     VkResult WaitIdle() { return vkDeviceWaitIdle(m_device); }
 

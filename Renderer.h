@@ -34,6 +34,10 @@ private:
 
     void CreateFramebuffers();
 
+    void CreateDescriptorSetLayout();
+
+    void CreateBufferingObjects();
+
     void CreatePipeline();
 
     void CreateVertexBuffer();
@@ -43,6 +47,14 @@ private:
 
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> m_framebuffers;
+
+    VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+
+    struct BufferingObjects {
+        VulkanBuffer CameraUniformBuffer;
+        VkDescriptorSet DescriptorSet;
+    };
+    std::vector<BufferingObjects> m_bufferingObjects;
 
     bool m_fill = true;
     std::unique_ptr<VulkanPipeline> m_fillPipeline;

@@ -10,17 +10,24 @@
 #include "VertexBase.h"
 #include "MeshUtilities.h"
 
-struct PushConstantData {
-    glm::mat4 Matrix;
+struct CameraUniformData {
+    glm::mat4 Projection;
+    glm::mat4 View;
+};
+
+struct ModelConstantsData {
+    glm::mat4 Model;
 };
 
 Renderer::Renderer(GLFWwindow *window) {
     m_window = window;
-    m_device = std::make_unique<VulkanBase>(window);
+    m_device = std::make_unique<VulkanBase>(window, false);
     CreateRenderPass();
     CreateFramebuffers();
+    CreateDescriptorSetLayout();
     CreatePipeline();
     CreateVertexBuffer();
+    CreateBufferingObjects();
 }
 
 void Renderer::CreateRenderPass() {
@@ -95,10 +102,58 @@ void Renderer::CreateFramebuffers() {
     }
 }
 
+void Renderer::CreateDescriptorSetLayout() {
+    VkDescriptorSetLayoutBinding cameraUniformBinding{};
+    cameraUniformBinding.binding = 0;
+    cameraUniformBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    cameraUniformBinding.descriptorCount = 1;
+    cameraUniformBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    createInfo.bindingCount = 1;
+    createInfo.pBindings = &cameraUniformBinding;
+
+    m_descriptorSetLayout = m_device->CreateDescriptorSetLayout(createInfo);
+}
+
+void Renderer::CreateBufferingObjects() {
+    m_bufferingObjects.resize(m_device->GetNumBuffering());
+    for (BufferingObjects &bufferingObjects: m_bufferingObjects) {
+        VulkanBuffer cameraUniformBuffer = m_device->CreateBuffer(
+                sizeof(CameraUniformData),
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
+                VMA_MEMORY_USAGE_AUTO_PREFER_HOST
+        );
+
+        VkDescriptorSet descriptorSet = m_device->AllocateDescriptorSet(m_descriptorSetLayout);
+
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = cameraUniformBuffer.Get();
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(CameraUniformData);
+
+        VkWriteDescriptorSet writeDescriptorSet{};
+        writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writeDescriptorSet.dstSet = descriptorSet;
+        writeDescriptorSet.dstBinding = 0;
+        writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writeDescriptorSet.descriptorCount = 1;
+        writeDescriptorSet.pBufferInfo = &bufferInfo;
+
+        m_device->WriteDescriptorSet(writeDescriptorSet);
+
+        bufferingObjects.CameraUniformBuffer = std::move(cameraUniformBuffer);
+        bufferingObjects.DescriptorSet = descriptorSet;
+    }
+}
+
 void Renderer::CreatePipeline() {
     VulkanPipelineCreateInfo pipelineCreateInfo{};
     pipelineCreateInfo.Device = m_device.get();
-    pipelineCreateInfo.PushConstantSize = sizeof(PushConstantData);
+    pipelineCreateInfo.DescriptorSetLayout = m_descriptorSetLayout;
+    pipelineCreateInfo.PushConstantSize = sizeof(ModelConstantsData);
     pipelineCreateInfo.ShaderStages = {
             {VK_SHADER_STAGE_VERTEX_BIT,   R"GLSL(
 #version 450 core
@@ -109,14 +164,19 @@ layout (location = 2) in vec2 aTexCoord;
 
 layout (location = 0) out vec4 vColor;
 
-layout (push_constant) uniform PushConstant
+layout (set = 0, binding = 0) uniform CameraUniformData {
+    mat4 uProjection;
+    mat4 uView;
+};
+
+layout (push_constant) uniform ModelConstantsData
 {
-    mat4 uMatrix;
+    mat4 uModel;
 };
 
 void main()
 {
-    gl_Position = uMatrix * vec4(aPosition, 1);
+    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1);
     vColor = vec4(aTexCoord, 0, 1);
 }
 )GLSL"},
@@ -168,6 +228,12 @@ Renderer::~Renderer() {
     m_fillPipeline.reset();
     m_wirePipeline.reset();
 
+    for (BufferingObjects &bufferingObjects: m_bufferingObjects) {
+        bufferingObjects.CameraUniformBuffer = {};
+        m_device->FreeDescriptorSet(bufferingObjects.DescriptorSet);
+    }
+
+    m_device->DestroyDescriptorSetLayout(m_descriptorSetLayout);
     for (auto &framebuffer: m_framebuffers) {
         m_device->DestroyFramebuffer(framebuffer);
     }
@@ -180,6 +246,22 @@ void Renderer::Frame(float deltaTime) {
     m_rotation += glm::radians(deltaTime * m_rotationSpeed);
 
     auto [swapchainImageIndex, bufferingIndex, cmd] = m_device->BeginFrame();
+
+    BufferingObjects &bufferingObjects = m_bufferingObjects[bufferingIndex];
+    const VkExtent2D &swapchainExtent = m_device->GetSwapchainExtent();
+    const glm::mat4 projection = glm::perspective(
+            glm::radians(60.0f),
+            static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height),
+            0.1f,
+            100.0f
+    );
+    const glm::mat4 view = glm::lookAt(
+            glm::vec3(3.0f, 4.0f, -5.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f)
+    );
+    CameraUniformData cameraUniformData{projection, view};
+    bufferingObjects.CameraUniformBuffer.Upload(cameraUniformData);
 
     VkClearValue clearValues[2];
     VkClearColorValue &clearColor = clearValues[0].color;
@@ -201,23 +283,10 @@ void Renderer::Frame(float deltaTime) {
 
     VulkanPipeline *pipeline = m_fill ? m_fillPipeline.get() : m_wirePipeline.get();
     pipeline->Bind(cmd);
-    const VkExtent2D &swapchainExtent = m_device->GetSwapchainExtent();
-    const glm::mat4 projection = glm::perspective(
-            glm::radians(60.0f),
-            static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height),
-            0.1f,
-            100.0f
-    );
-    const glm::mat4 view = glm::lookAt(
-            glm::vec3(3.0f, 4.0f, -5.0f),
-            glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f)
-    );
+    pipeline->BindDescriptorSet(cmd, bufferingObjects.DescriptorSet);
     const glm::mat4 model = glm::rotate(glm::mat4(1.0f), m_rotation, glm::vec3(0.0f, 1.0f, 0.0f));
-    const PushConstantData pushConstant{
-            projection * view * model
-    };
-    pipeline->PushConstant(cmd, pushConstant);
+    const ModelConstantsData constantsData{model};
+    pipeline->PushConstants(cmd, constantsData);
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuffer.Get(), &offset);
     vkCmdDraw(cmd, 36, 1, 0, 0);

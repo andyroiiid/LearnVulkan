@@ -14,6 +14,7 @@ struct VulkanShaderStageCreateInfo {
 struct VulkanPipelineCreateInfo {
     VulkanBase *Device = nullptr;
 
+    VkDescriptorSetLayout DescriptorSetLayout = VK_NULL_HANDLE;
     uint32_t PushConstantSize = 0;
 
     std::vector<VulkanShaderStageCreateInfo> ShaderStages;
@@ -46,9 +47,13 @@ public:
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     }
 
+    void BindDescriptorSet(VkCommandBuffer commandBuffer, VkDescriptorSet descriptorSet) {
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+    }
+
     template<class T>
-    void PushConstant(VkCommandBuffer commandBuffer, const T &pushConstantData) {
-        vkCmdPushConstants(commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(T), &pushConstantData);
+    void PushConstants(VkCommandBuffer commandBuffer, const T &constantsData) {
+        vkCmdPushConstants(commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(T), &constantsData);
     }
 
 private:

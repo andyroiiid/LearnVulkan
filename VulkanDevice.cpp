@@ -387,3 +387,33 @@ VkImageView VulkanDevice::CreateImageView(const VkImageViewCreateInfo &createInf
     );
     return imageView;
 }
+
+VkDescriptorSetLayout VulkanDevice::CreateDescriptorSetLayout(const VkDescriptorSetLayoutCreateInfo &createInfo) {
+    VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+    DebugCheckCriticalVk(
+            vkCreateDescriptorSetLayout(m_device, &createInfo, nullptr, &descriptorSetLayout),
+            "Failed to create Vulkan descriptor set layout."
+    );
+    return descriptorSetLayout;
+}
+
+VkDescriptorSet VulkanDevice::AllocateDescriptorSet(VkDescriptorSetLayout descriptorSetLayout) {
+    VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+    VkDescriptorSetAllocateInfo allocateInfo{};
+    allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocateInfo.descriptorPool = m_descriptorPool;
+    allocateInfo.descriptorSetCount = 1;
+    allocateInfo.pSetLayouts = &descriptorSetLayout;
+    DebugCheckCriticalVk(
+            vkAllocateDescriptorSets(m_device, &allocateInfo, &descriptorSet),
+            "Failed to allocate Vulkan descriptor set."
+    );
+    return descriptorSet;
+}
+
+void VulkanDevice::FreeDescriptorSet(VkDescriptorSet descriptorSet) {
+    DebugCheckCriticalVk(
+            vkFreeDescriptorSets(m_device, m_descriptorPool, 1, &descriptorSet),
+            "Failed to free Vulkan descriptor set."
+    );
+}
