@@ -379,15 +379,6 @@ VkPipeline VulkanDevice::CreateGraphicsPipeline(const VkGraphicsPipelineCreateIn
     return pipeline;
 }
 
-VulkanImage VulkanDevice::CreateImage(const VkImageCreateInfo &imageCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo) {
-    VulkanImage image;
-    DebugCheckCriticalVk(
-            vmaCreateImage(m_allocator, &imageCreateInfo, &allocationCreateInfo, &image.Image, &image.Allocation, nullptr),
-            "Failed to create Vulkan image."
-    );
-    return image;
-}
-
 VkImageView VulkanDevice::CreateImageView(const VkImageViewCreateInfo &createInfo) {
     VkImageView imageView = VK_NULL_HANDLE;
     DebugCheckCriticalVk(

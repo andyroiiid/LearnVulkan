@@ -9,11 +9,7 @@
 #include <vk_mem_alloc.h>
 
 #include "VulkanBuffer.h"
-
-struct VulkanImage {
-    VkImage Image = VK_NULL_HANDLE;
-    VmaAllocation Allocation = VK_NULL_HANDLE;
-};
+#include "VulkanImage.h"
 
 class VulkanDevice {
 public:
@@ -50,8 +46,6 @@ public:
         return {m_allocator, size, bufferUsage, flags, memoryUsage};
     }
 
-    VulkanImage CreateImage(const VkImageCreateInfo &imageCreateInfo, const VmaAllocationCreateInfo &allocationCreateInfo);
-
     VulkanImage CreateImage2D(
             VkFormat format,
             const VkExtent2D &extent,
@@ -59,21 +53,7 @@ public:
             VmaAllocationCreateFlags flags,
             VmaMemoryUsage memoryUsage
     ) {
-        VkImageCreateInfo imageCreateInfo{};
-        imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageCreateInfo.format = format;
-        imageCreateInfo.extent = {extent.width, extent.height, 1};
-        imageCreateInfo.mipLevels = 1;
-        imageCreateInfo.arrayLayers = 1;
-        imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageCreateInfo.usage = imageUsage;
-
-        VmaAllocationCreateInfo allocationCreateInfo{};
-        allocationCreateInfo.flags = flags;
-        allocationCreateInfo.usage = memoryUsage;
-
-        return CreateImage(imageCreateInfo, allocationCreateInfo);
+        return {m_allocator, format, extent, imageUsage, flags, memoryUsage};
     }
 
     VkImageView CreateImageView(const VkImageViewCreateInfo &createInfo);
@@ -87,8 +67,6 @@ public:
     void DestroyPipelineLayout(VkPipelineLayout pipelineLayout) { vkDestroyPipelineLayout(m_device, pipelineLayout, nullptr); }
 
     void DestroyPipeline(VkPipeline pipeline) { vkDestroyPipeline(m_device, pipeline, nullptr); }
-
-    void DestroyImage(VulkanImage image) { vmaDestroyImage(m_allocator, image.Image, image.Allocation); }
 
     void DestroyImageView(VkImageView imageView) { vkDestroyImageView(m_device, imageView, nullptr); }
 

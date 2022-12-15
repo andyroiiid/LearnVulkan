@@ -116,7 +116,7 @@ void VulkanBase::CreateDepthStencilImageAndViews() {
         );
         VkImageViewCreateInfo imageViewCreateInfo{};
         imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        imageViewCreateInfo.image = m_depthStencilImages[i].Image;
+        imageViewCreateInfo.image = m_depthStencilImages[i].Get();
         imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         imageViewCreateInfo.format = m_depthStencilFormat;
         VkImageSubresourceRange &depthImageViewSubresourceRange = imageViewCreateInfo.subresourceRange;
@@ -188,7 +188,7 @@ VulkanBase::~VulkanBase() {
         DestroyImageView(depthStencilImageView);
     }
     for (auto &depthStencilImage: m_depthStencilImages) {
-        DestroyImage(depthStencilImage);
+        depthStencilImage = {};
     }
     for (auto &swapchainImageView: m_swapchainImageViews) {
         DestroyImageView(swapchainImageView);
