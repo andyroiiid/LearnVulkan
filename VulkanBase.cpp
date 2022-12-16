@@ -5,19 +5,25 @@
 #include "VulkanBase.h"
 
 #include <algorithm>
+#include <imgui.h>
+#include <imgui_impl_vulkan.h>
+#include <imgui_impl_glfw.h>
 
 #include "Debug.h"
 
 VulkanBase::VulkanBase(GLFWwindow *window, bool vsync, size_t numBuffering)
-        : VulkanDevice(window),
-          m_vsync(vsync) {
-    CreateSwapchain();
+        : VulkanDevice(window) {
+    CreateImmediateContext();
+    CreateSwapchain(vsync);
     CreateSwapchainImageViews();
     CreateDepthStencilImageAndViews();
-
-    CreateImmediateContext();
-
     CreateBufferingObjects(numBuffering);
+}
+
+void VulkanBase::CreateImmediateContext() {
+    m_immediateFence = CreateFence(VK_FENCE_CREATE_SIGNALED_BIT);
+    m_immediateCommandPool = CreateCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    m_immediateCommandBuffer = AllocateCommandBuffer(m_immediateCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 }
 
 static VkExtent2D CalcSwapchainExtent(const VkSurfaceCapabilitiesKHR &capabilities, GLFWwindow *window) {
@@ -35,7 +41,7 @@ static VkExtent2D CalcSwapchainExtent(const VkSurfaceCapabilitiesKHR &capabiliti
     return capabilities.currentExtent;
 }
 
-void VulkanBase::CreateSwapchain() {
+void VulkanBase::CreateSwapchain(bool vsync) {
     VkSurfaceCapabilitiesKHR capabilities;
     DebugCheckCriticalVk(
             vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &capabilities),
@@ -71,7 +77,7 @@ void VulkanBase::CreateSwapchain() {
     }
     createInfo.preTransform = capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode = m_vsync ? VK_PRESENT_MODE_FIFO_KHR : m_presentMode;
+    createInfo.presentMode = vsync ? VK_PRESENT_MODE_FIFO_KHR : m_presentMode;
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = m_swapchain;
     DebugCheckCriticalVk(
@@ -130,12 +136,6 @@ void VulkanBase::CreateDepthStencilImageAndViews() {
     }
 }
 
-void VulkanBase::CreateImmediateContext() {
-    m_immediateFence = CreateFence(VK_FENCE_CREATE_SIGNALED_BIT);
-    m_immediateCommandPool = CreateCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    m_immediateCommandBuffer = AllocateCommandBuffer(m_immediateCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-}
-
 void VulkanBase::CreateBufferingObjects(size_t numBuffering) {
     m_bufferingObjects.resize(numBuffering);
     for (BufferingObjects &bufferingObjects: m_bufferingObjects) {
@@ -160,10 +160,6 @@ VulkanBase::~VulkanBase() {
         DestroyFence(bufferingObjects.RenderFence);
     }
 
-    FreeCommandBuffer(m_immediateCommandPool, m_immediateCommandBuffer);
-    DestroyCommandPool(m_immediateCommandPool);
-    DestroyFence(m_immediateFence);
-
     for (auto &depthStencilImageView: m_depthStencilImageViews) {
         DestroyImageView(depthStencilImageView);
     }
@@ -174,6 +170,63 @@ VulkanBase::~VulkanBase() {
         DestroyImageView(swapchainImageView);
     }
     vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+
+    FreeCommandBuffer(m_immediateCommandPool, m_immediateCommandBuffer);
+    DestroyCommandPool(m_immediateCommandPool);
+    DestroyFence(m_immediateFence);
+}
+
+void VulkanBase::ImGuiInit(VkRenderPass renderPass) {
+    ImGui::CreateContext();
+    ImGui::GetIO().IniFilename = nullptr;
+
+    ImGui_ImplGlfw_InitForVulkan(m_window, true);
+
+    ImGui_ImplVulkan_InitInfo initInfo{};
+    initInfo.Instance = m_instance;
+    initInfo.PhysicalDevice = m_physicalDevice;
+    initInfo.Device = m_device;
+    initInfo.QueueFamily = m_graphicsQueueFamilyIndex;
+    initInfo.Queue = m_graphicsQueue;
+    initInfo.DescriptorPool = m_descriptorPool;
+    initInfo.MinImageCount = GetNumBuffering();
+    initInfo.ImageCount = GetNumBuffering();
+    initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    initInfo.CheckVkResultFn = [](VkResult result) {
+        DebugCheckVk(result, "Vulkan error in ImGui: {}", result);
+    };
+    ImGui_ImplVulkan_Init(&initInfo, renderPass);
+
+    ImmediateSubmit([](VkCommandBuffer cmd) {
+        ImGui_ImplVulkan_CreateFontsTexture(cmd);
+    });
+
+    m_imguiEnabled = true;
+}
+
+void VulkanBase::ImGuiShutdown() {
+    m_imguiEnabled = false;
+
+    WaitIdle();
+    ImGui_ImplVulkan_DestroyFontUploadObjects();
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+}
+
+void VulkanBase::ImGuiNewFrame() { // NOLINT(readability-make-member-function-const)
+    if (!m_imguiEnabled) return;
+
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+}
+
+void VulkanBase::ImGuiRender(VkCommandBuffer commandBuffer) { // NOLINT(readability-make-member-function-const)
+    if (!m_imguiEnabled) return;
+
+    ImGui::Render();
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 }
 
 VulkanBase::BeginFrameInfo VulkanBase::BeginFrame() {

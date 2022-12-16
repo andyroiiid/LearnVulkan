@@ -30,6 +30,14 @@ public:
 
     [[nodiscard]] size_t GetNumBuffering() const { return m_bufferingObjects.size(); }
 
+    void ImGuiInit(VkRenderPass renderPass);
+
+    void ImGuiShutdown();
+
+    void ImGuiNewFrame();
+
+    void ImGuiRender(VkCommandBuffer commandBuffer);
+
     struct BeginFrameInfo {
         [[maybe_unused]] uint32_t SwapchainImageIndex;
         [[maybe_unused]] uint32_t BufferingIndex;
@@ -55,17 +63,19 @@ public:
     }
 
 private:
-    void CreateSwapchain();
+    void CreateImmediateContext();
+
+    void CreateSwapchain(bool vsync);
 
     void CreateSwapchainImageViews();
 
     void CreateDepthStencilImageAndViews();
 
-    void CreateImmediateContext();
-
     void CreateBufferingObjects(size_t numBuffering);
 
-    bool m_vsync = true;
+    VkFence m_immediateFence = VK_NULL_HANDLE;
+    VkCommandPool m_immediateCommandPool = VK_NULL_HANDLE;
+    VkCommandBuffer m_immediateCommandBuffer = VK_NULL_HANDLE;
 
     VkExtent2D m_swapchainExtent{};
     VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
@@ -75,10 +85,6 @@ private:
     VkFormat m_depthStencilFormat = VK_FORMAT_D32_SFLOAT;
     std::vector<VulkanImage> m_depthStencilImages;
     std::vector<VkImageView> m_depthStencilImageViews;
-
-    VkFence m_immediateFence = VK_NULL_HANDLE;
-    VkCommandPool m_immediateCommandPool = VK_NULL_HANDLE;
-    VkCommandBuffer m_immediateCommandBuffer = VK_NULL_HANDLE;
 
     struct BufferingObjects {
         VkFence RenderFence = VK_NULL_HANDLE;
@@ -93,4 +99,6 @@ private:
     uint32_t m_currentSwapchainImageIndex = 0;
     uint32_t m_currentFrameCount = 0;
     uint32_t m_currentBufferingIndex = 0;
+
+    bool m_imguiEnabled = false;
 };

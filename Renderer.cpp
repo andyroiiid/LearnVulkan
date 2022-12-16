@@ -5,6 +5,7 @@
 #include "Renderer.h"
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui.h>
 
 #include "VertexBase.h"
 #include "MeshUtilities.h"
@@ -29,6 +30,7 @@ Renderer::Renderer(GLFWwindow *window) {
     CreatePipeline();
     CreateMesh();
     CreateTexture();
+    m_device->ImGuiInit(m_renderPass);
 }
 
 void Renderer::CreateRenderPass() {
@@ -309,6 +311,8 @@ void Renderer::CreateTexture() {
 Renderer::~Renderer() {
     m_device->WaitIdle();
 
+    m_device->ImGuiShutdown();
+
     m_device->DestroyImageView(m_imageView);
     m_image = {};
 
@@ -332,6 +336,7 @@ Renderer::~Renderer() {
 }
 
 void Renderer::Frame(float deltaTime) {
+    m_fps = 1.0f / deltaTime;
     m_rotation += glm::radians(deltaTime * m_rotationSpeed);
 
     auto [swapchainImageIndex, bufferingIndex, cmd] = m_device->BeginFrame();
@@ -378,6 +383,16 @@ void Renderer::Frame(float deltaTime) {
     pipeline.PushConstants(cmd, constantsData);
     m_mesh.BindAndDraw(cmd);
 
+    if (m_showImGui) {
+        m_device->ImGuiNewFrame();
+        if (ImGui::BeginMainMenuBar()) {
+            ImGui::Text("fps = %f", m_fps);
+        }
+        ImGui::EndMainMenuBar();
+        ImGui::Checkbox("Set Filled", &m_fill);
+        m_device->ImGuiRender(cmd);
+    }
+
     vkCmdEndRenderPass(cmd);
 
     m_device->EndFrame();
@@ -388,7 +403,7 @@ void Renderer::OnKeyDown(int key) {
         glfwSetWindowShouldClose(m_window, GLFW_TRUE);
     }
     if (key == GLFW_KEY_TAB) {
-        m_fill = !m_fill;
+        m_showImGui = !m_showImGui;
     }
     if (key == GLFW_KEY_SPACE) {
         m_rotationSpeed = 90.0f;

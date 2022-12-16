@@ -68,6 +68,10 @@ private:
     VulkanImage m_image;
     VkImageView m_imageView = VK_NULL_HANDLE;
 
+    bool m_showImGui = true;
+
+    float m_fps = 0.0f;
+
     float m_rotationSpeed = 0.0f;
     float m_rotation = 0.0f;
 };

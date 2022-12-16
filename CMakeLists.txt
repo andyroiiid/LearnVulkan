@@ -23,6 +23,8 @@ add_subdirectory(glm EXCLUDE_FROM_ALL)
 
 add_subdirectory(stb EXCLUDE_FROM_ALL)
 
+add_subdirectory(imgui EXCLUDE_FROM_ALL)
+
 set(CMAKE_CXX_STANDARD 17)
 
 add_executable(LearnVulkan
@@ -45,4 +47,4 @@ add_executable(LearnVulkan
 
 target_compile_definitions(LearnVulkan PUBLIC GLFW_INCLUDE_VULKAN GLM_FORCE_LEFT_HANDED GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
-target_link_libraries(LearnVulkan PUBLIC spdlog glfw Vulkan::Vulkan glslang SPIRV glslang-default-resource-limits VulkanMemoryAllocator glm stb)
+target_link_libraries(LearnVulkan PUBLIC spdlog glfw Vulkan::Vulkan glslang SPIRV glslang-default-resource-limits VulkanMemoryAllocator glm stb imgui)
