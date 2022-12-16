@@ -25,9 +25,9 @@ Renderer::Renderer(GLFWwindow *window) {
     CreateRenderPass();
     CreateFramebuffers();
     CreateDescriptorSetLayout();
-    CreatePipeline();
-    CreateVertexBuffer();
     CreateBufferingObjects();
+    CreatePipeline();
+    CreateMesh();
 }
 
 void Renderer::CreateRenderPass() {
@@ -203,24 +203,16 @@ void main()
     m_wirePipeline = std::make_unique<VulkanPipeline>(pipelineCreateInfo);
 }
 
-void Renderer::CreateVertexBuffer() {
+void Renderer::CreateMesh() {
     std::vector<VertexBase> vertices;
     AppendBoxVertices(vertices, {-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f, 1.0f});
-
-    m_vertexBuffer = m_device->CreateBuffer(
-            vertices.size() * sizeof(VertexBase),
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
-            VMA_MEMORY_USAGE_AUTO
-    );
-
-    m_vertexBuffer.Upload(vertices);
+    m_mesh = VulkanMesh(m_device.get(), vertices.size(), sizeof(VertexBase), vertices.data());
 }
 
 Renderer::~Renderer() {
     m_device->WaitIdle();
 
-    m_vertexBuffer = {};
+    m_mesh = {};
 
     m_fillPipeline.reset();
     m_wirePipeline.reset();
@@ -258,7 +250,7 @@ void Renderer::Frame(float deltaTime) {
             glm::vec3(0.0f, 1.0f, 0.0f)
     );
     CameraUniformData cameraUniformData{projection, view};
-    bufferingObjects.CameraUniformBuffer.Upload(cameraUniformData);
+    bufferingObjects.CameraUniformBuffer.Upload(sizeof(CameraUniformData), &cameraUniformData);
 
     VkClearValue clearValues[2];
     VkClearColorValue &clearColor = clearValues[0].color;
@@ -284,9 +276,7 @@ void Renderer::Frame(float deltaTime) {
     const glm::mat4 model = glm::rotate(glm::mat4(1.0f), m_rotation, glm::vec3(0.0f, 1.0f, 0.0f));
     const ModelConstantsData constantsData{model};
     pipeline->PushConstants(cmd, constantsData);
-    VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuffer.Get(), &offset);
-    vkCmdDraw(cmd, 36, 1, 0, 0);
+    m_mesh.BindAndDraw(cmd);
 
     vkCmdEndRenderPass(cmd);
 

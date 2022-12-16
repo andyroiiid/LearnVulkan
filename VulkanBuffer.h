@@ -46,16 +46,6 @@ public:
 
     void Upload(size_t size, const void *data);
 
-    template<class T>
-    void Upload(const std::vector<T> &data) {
-        Upload(data.size() * sizeof(T), data.data());
-    }
-
-    template<class T>
-    void Upload(const T &data) {
-        Upload(sizeof(T), &data);
-    }
-
     [[nodiscard]] const VkBuffer &Get() const { return m_buffer; }
 
 private:

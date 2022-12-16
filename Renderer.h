@@ -8,6 +8,7 @@
 
 #include "VulkanBase.h"
 #include "VulkanPipeline.h"
+#include "VulkanMesh.h"
 
 class Renderer {
 public:
@@ -40,7 +41,7 @@ private:
 
     void CreatePipeline();
 
-    void CreateVertexBuffer();
+    void CreateMesh();
 
     GLFWwindow *m_window = nullptr;
     std::unique_ptr<VulkanBase> m_device;
@@ -60,7 +61,7 @@ private:
     std::unique_ptr<VulkanPipeline> m_fillPipeline;
     std::unique_ptr<VulkanPipeline> m_wirePipeline;
 
-    VulkanBuffer m_vertexBuffer;
+    VulkanMesh m_mesh;
 
     float m_rotationSpeed = 0.0f;
     float m_rotation = 0.0f;

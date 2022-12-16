@@ -32,6 +32,7 @@ add_executable(LearnVulkan
         VulkanImage.cpp VulkanImage.h
         VulkanDevice.cpp VulkanDevice.h
         VulkanBase.cpp VulkanBase.h
+        VulkanMesh.cpp VulkanMesh.h
         ShaderCompiler.cpp ShaderCompiler.h
         VulkanPipeline.cpp VulkanPipeline.h
         VertexBase.cpp VertexBase.h
