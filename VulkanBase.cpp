@@ -188,7 +188,7 @@ VulkanBase::BeginFrameInfo VulkanBase::BeginFrame() {
     );
 
     ResetCommandBuffer(bufferingObjects.CommandBuffer);
-    BeginCommandBuffer(bufferingObjects.CommandBuffer);
+    BeginCommandBuffer(bufferingObjects.CommandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
     return {m_currentSwapchainImageIndex, m_currentBufferingIndex, bufferingObjects.CommandBuffer};
 }

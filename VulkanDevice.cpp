@@ -491,6 +491,13 @@ void VulkanDevice::WaitIdle() {
     );
 }
 
+void VulkanDevice::WaitGraphicsQueueIdle() {
+    DebugCheckCriticalVk(
+            vkQueueWaitIdle(m_graphicsQueue),
+            "Failed when waiting for Vulkan graphics queue to be idle."
+    );
+}
+
 void VulkanDevice::SubmitToGraphicsQueue(const VkSubmitInfo &submitInfo, VkFence fence) {
     DebugCheckCriticalVk(
             vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, fence),

@@ -21,11 +21,15 @@ add_subdirectory(VulkanMemoryAllocator EXCLUDE_FROM_ALL)
 
 add_subdirectory(glm EXCLUDE_FROM_ALL)
 
+add_subdirectory(stb EXCLUDE_FROM_ALL)
+
 set(CMAKE_CXX_STANDARD 17)
 
 add_executable(LearnVulkan
         main.cpp
         Debug.h
+        Files.cpp Files.h
+        ImageFile.cpp ImageFile.h
         Window.cpp Window.h
         vk_mem_alloc.cpp
         VulkanBuffer.cpp VulkanBuffer.h
@@ -41,4 +45,4 @@ add_executable(LearnVulkan
 
 target_compile_definitions(LearnVulkan PUBLIC GLFW_INCLUDE_VULKAN GLM_FORCE_LEFT_HANDED GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
-target_link_libraries(LearnVulkan PUBLIC spdlog glfw Vulkan::Vulkan glslang SPIRV glslang-default-resource-limits VulkanMemoryAllocator glm)
+target_link_libraries(LearnVulkan PUBLIC spdlog glfw Vulkan::Vulkan glslang SPIRV glslang-default-resource-limits VulkanMemoryAllocator glm stb)

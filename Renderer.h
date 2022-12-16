@@ -43,6 +43,8 @@ private:
 
     void CreateMesh();
 
+    void CreateTexture();
+
     GLFWwindow *m_window = nullptr;
     std::unique_ptr<VulkanBase> m_device;
 
@@ -62,6 +64,9 @@ private:
     VulkanPipeline m_wirePipeline;
 
     VulkanMesh m_mesh;
+
+    VulkanImage m_image;
+    VkImageView m_imageView = VK_NULL_HANDLE;
 
     float m_rotationSpeed = 0.0f;
     float m_rotation = 0.0f;

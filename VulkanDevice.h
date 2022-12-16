@@ -126,6 +126,8 @@ public:
 
     void WaitIdle();
 
+    void WaitGraphicsQueueIdle();
+
     void SubmitToGraphicsQueue(const VkSubmitInfo &submitInfo, VkFence fence);
 
     void SubmitToGraphicsQueue(VkCommandBuffer commandBuffer, VkFence fence);
