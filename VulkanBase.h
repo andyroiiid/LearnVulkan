@@ -40,12 +40,27 @@ public:
 
     void EndFrame();
 
+    template<class Func>
+    void ImmediateSubmit(Func &&func) {
+        WaitForFence(m_immediateFence);
+        ResetFence(m_immediateFence);
+
+        ResetCommandBuffer(m_immediateCommandBuffer);
+        BeginCommandBuffer(m_immediateCommandBuffer);
+        func(m_immediateCommandBuffer);
+        EndCommandBuffer(m_immediateCommandBuffer);
+
+        SubmitToGraphicsQueue(m_immediateCommandBuffer, m_immediateFence);
+    }
+
 private:
     void CreateSwapchain();
 
     void CreateSwapchainImageViews();
 
     void CreateDepthStencilImageAndViews();
+
+    void CreateImmediateContext();
 
     void CreateBufferingObjects(size_t numBuffering);
 
@@ -59,6 +74,10 @@ private:
     VkFormat m_depthStencilFormat = VK_FORMAT_D32_SFLOAT;
     std::vector<VulkanImage> m_depthStencilImages;
     std::vector<VkImageView> m_depthStencilImageViews;
+
+    VkFence m_immediateFence = VK_NULL_HANDLE;
+    VkCommandPool m_immediateCommandPool = VK_NULL_HANDLE;
+    VkCommandBuffer m_immediateCommandBuffer = VK_NULL_HANDLE;
 
     struct BufferingObjects {
         VkFence RenderFence = VK_NULL_HANDLE;

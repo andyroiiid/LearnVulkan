@@ -27,6 +27,34 @@ public:
 
     [[nodiscard]] const VkSurfaceFormatKHR &GetSurfaceFormat() const { return m_surfaceFormat; }
 
+    VkFence CreateFence(VkFenceCreateFlags flags = 0);
+
+    void DestroyFence(VkFence fence) {
+        vkDestroyFence(m_device, fence, nullptr);
+    }
+
+    void WaitForFence(VkFence fence, uint64_t timeout = 1'000'000'000);
+
+    void ResetFence(VkFence fence);
+
+    VkSemaphore CreateSemaphore();
+
+    void DestroySemaphore(VkSemaphore semaphore) {
+        vkDestroySemaphore(m_device, semaphore, nullptr);
+    }
+
+    VkCommandPool CreateCommandPool(VkCommandPoolCreateFlags flags = 0);
+
+    void DestroyCommandPool(VkCommandPool commandPool) {
+        vkDestroyCommandPool(m_device, commandPool, nullptr);
+    }
+
+    VkCommandBuffer AllocateCommandBuffer(VkCommandPool commandPool, VkCommandBufferLevel level);
+
+    void FreeCommandBuffer(VkCommandPool commandPool, VkCommandBuffer commandBuffer) {
+        vkFreeCommandBuffers(m_device, commandPool, 1, &commandBuffer);
+    }
+
     VkRenderPass CreateRenderPass(const VkRenderPassCreateInfo &createInfo);
 
     void DestroyRenderPass(VkRenderPass renderPass) {
@@ -96,7 +124,11 @@ public:
         vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
     }
 
-    VkResult WaitIdle() { return vkDeviceWaitIdle(m_device); }
+    void WaitIdle();
+
+    void SubmitToGraphicsQueue(const VkSubmitInfo &submitInfo, VkFence fence);
+
+    void SubmitToGraphicsQueue(VkCommandBuffer commandBuffer, VkFence fence);
 
 protected:
     void CreateInstance();
@@ -133,3 +165,9 @@ protected:
 
     VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
 };
+
+void BeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlags flags = 0);
+
+void EndCommandBuffer(VkCommandBuffer commandBuffer);
+
+void ResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags = 0);

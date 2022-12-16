@@ -218,10 +218,7 @@ void Renderer::CreateVertexBuffer() {
 }
 
 Renderer::~Renderer() {
-    DebugCheckCriticalVk(
-            m_device->WaitIdle(),
-            "Failed to wait for Vulkan device when trying to cleanup renderer."
-    );
+    m_device->WaitIdle();
 
     m_vertexBuffer = {};
 

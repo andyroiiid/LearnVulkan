@@ -15,6 +15,8 @@ VulkanBase::VulkanBase(GLFWwindow *window, bool vsync, size_t numBuffering)
     CreateSwapchainImageViews();
     CreateDepthStencilImageAndViews();
 
+    CreateImmediateContext();
+
     CreateBufferingObjects(numBuffering);
 }
 
@@ -128,61 +130,39 @@ void VulkanBase::CreateDepthStencilImageAndViews() {
     }
 }
 
+void VulkanBase::CreateImmediateContext() {
+    m_immediateFence = CreateFence(VK_FENCE_CREATE_SIGNALED_BIT);
+    m_immediateCommandPool = CreateCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    m_immediateCommandBuffer = AllocateCommandBuffer(m_immediateCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+}
+
 void VulkanBase::CreateBufferingObjects(size_t numBuffering) {
     m_bufferingObjects.resize(numBuffering);
     for (BufferingObjects &bufferingObjects: m_bufferingObjects) {
-        VkFenceCreateInfo fenceCreateInfo{};
-        fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-        DebugCheckCriticalVk(
-                vkCreateFence(m_device, &fenceCreateInfo, nullptr, &bufferingObjects.RenderFence),
-                "Failed to create Vulkan render fence."
-        );
+        bufferingObjects.RenderFence = CreateFence(VK_FENCE_CREATE_SIGNALED_BIT);
+        bufferingObjects.PresentSemaphore = CreateSemaphore();
+        bufferingObjects.RenderSemaphore = CreateSemaphore();
 
-        VkSemaphoreCreateInfo semaphoreCreateInfo{};
-        semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        DebugCheckCriticalVk(
-                vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &bufferingObjects.PresentSemaphore),
-                "Failed to create Vulkan present semaphore."
-        );
-        DebugCheckCriticalVk(
-                vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &bufferingObjects.RenderSemaphore),
-                "Failed to create Vulkan render semaphore."
-        );
-
-        VkCommandPoolCreateInfo commandPoolCreateInfo{};
-        commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        commandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        commandPoolCreateInfo.queueFamilyIndex = m_graphicsQueueFamilyIndex;
-        DebugCheckCriticalVk(
-                vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &bufferingObjects.CommandPool),
-                "Failed to create Vulkan command pool."
-        );
-
-        VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
-        commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        commandBufferAllocateInfo.commandPool = bufferingObjects.CommandPool;
-        commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        commandBufferAllocateInfo.commandBufferCount = 1;
-        DebugCheckCriticalVk(
-                vkAllocateCommandBuffers(m_device, &commandBufferAllocateInfo, &bufferingObjects.CommandBuffer),
-                "Failed to allocate Vulkan command buffer."
-        );
+        bufferingObjects.CommandPool = CreateCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+        bufferingObjects.CommandBuffer = AllocateCommandBuffer(bufferingObjects.CommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
     }
 }
 
 VulkanBase::~VulkanBase() {
-    DebugCheckCriticalVk(
-            WaitIdle(),
-            "Failed to wait for Vulkan device when trying to cleanup."
-    );
+    WaitIdle();
 
     for (const BufferingObjects &bufferingObjects: m_bufferingObjects) {
-        vkDestroyCommandPool(m_device, bufferingObjects.CommandPool, nullptr);
-        vkDestroySemaphore(m_device, bufferingObjects.PresentSemaphore, nullptr);
-        vkDestroySemaphore(m_device, bufferingObjects.RenderSemaphore, nullptr);
-        vkDestroyFence(m_device, bufferingObjects.RenderFence, nullptr);
+        FreeCommandBuffer(bufferingObjects.CommandPool, bufferingObjects.CommandBuffer);
+        DestroyCommandPool(bufferingObjects.CommandPool);
+
+        DestroySemaphore(bufferingObjects.PresentSemaphore);
+        DestroySemaphore(bufferingObjects.RenderSemaphore);
+        DestroyFence(bufferingObjects.RenderFence);
     }
+
+    FreeCommandBuffer(m_immediateCommandPool, m_immediateCommandBuffer);
+    DestroyCommandPool(m_immediateCommandPool);
+    DestroyFence(m_immediateFence);
 
     for (auto &depthStencilImageView: m_depthStencilImageViews) {
         DestroyImageView(depthStencilImageView);
@@ -199,31 +179,16 @@ VulkanBase::~VulkanBase() {
 VulkanBase::BeginFrameInfo VulkanBase::BeginFrame() {
     BufferingObjects &bufferingObjects = m_bufferingObjects[m_currentBufferingIndex];
 
-    DebugCheckCriticalVk(
-            vkWaitForFences(m_device, 1, &bufferingObjects.RenderFence, true, 1'000'000'000),
-            "Failed to wait for Vulkan render fence."
-    );
-    DebugCheckCriticalVk(
-            vkResetFences(m_device, 1, &bufferingObjects.RenderFence),
-            "Failed to reset Vulkan render fence."
-    );
+    WaitForFence(bufferingObjects.RenderFence);
+    ResetFence(bufferingObjects.RenderFence);
+
     DebugCheckCriticalVk(
             vkAcquireNextImageKHR(m_device, m_swapchain, 1'000'000'000, bufferingObjects.PresentSemaphore, nullptr, &m_currentSwapchainImageIndex),
             "Failed to acquire next Vulkan swapchain image."
     );
 
-    DebugCheckCriticalVk(
-            vkResetCommandBuffer(bufferingObjects.CommandBuffer, 0),
-            "Failed to reset Vulkan command buffer."
-    );
-
-    VkCommandBufferBeginInfo commandBufferBeginInfo{};
-    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    DebugCheckCriticalVk(
-            vkBeginCommandBuffer(bufferingObjects.CommandBuffer, &commandBufferBeginInfo),
-            "Failed to begin Vulkan command buffer."
-    );
+    ResetCommandBuffer(bufferingObjects.CommandBuffer);
+    BeginCommandBuffer(bufferingObjects.CommandBuffer);
 
     return {m_currentSwapchainImageIndex, m_currentBufferingIndex, bufferingObjects.CommandBuffer};
 }
@@ -231,10 +196,7 @@ VulkanBase::BeginFrameInfo VulkanBase::BeginFrame() {
 void VulkanBase::EndFrame() {
     BufferingObjects &bufferingObjects = m_bufferingObjects[m_currentBufferingIndex];
 
-    DebugCheckCriticalVk(
-            vkEndCommandBuffer(bufferingObjects.CommandBuffer),
-            "Failed to end Vulkan command buffer."
-    );
+    EndCommandBuffer(bufferingObjects.CommandBuffer);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -246,10 +208,7 @@ void VulkanBase::EndFrame() {
     submitInfo.pCommandBuffers = &bufferingObjects.CommandBuffer;
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &bufferingObjects.RenderSemaphore;
-    DebugCheckCriticalVk(
-            vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, bufferingObjects.RenderFence),
-            "Failed to submit Vulkan command buffer."
-    );
+    SubmitToGraphicsQueue(submitInfo, bufferingObjects.RenderFence);
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;

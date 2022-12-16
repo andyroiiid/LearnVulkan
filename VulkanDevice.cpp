@@ -326,12 +326,78 @@ void VulkanDevice::CreateDescriptorPool() {
 }
 
 VulkanDevice::~VulkanDevice() {
+    WaitIdle();
+
     vkDestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
     vmaDestroyAllocator(m_allocator);
     vkDestroyDevice(m_device, nullptr);
     vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
     vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
     vkDestroyInstance(m_instance, nullptr);
+}
+
+VkFence VulkanDevice::CreateFence(VkFenceCreateFlags flags) {
+    VkFence fence = VK_NULL_HANDLE;
+    VkFenceCreateInfo fenceCreateInfo{};
+    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceCreateInfo.flags = flags;
+    DebugCheckCriticalVk(
+            vkCreateFence(m_device, &fenceCreateInfo, nullptr, &fence),
+            "Failed to create Vulkan fence."
+    );
+    return fence;
+}
+
+void VulkanDevice::WaitForFence(VkFence fence, uint64_t timeout) {
+    DebugCheckCriticalVk(
+            vkWaitForFences(m_device, 1, &fence, true, timeout),
+            "Failed to wait for Vulkan fence."
+    );
+}
+
+void VulkanDevice::ResetFence(VkFence fence) {
+    DebugCheckCriticalVk(
+            vkResetFences(m_device, 1, &fence),
+            "Failed to reset Vulkan fence."
+    );
+}
+
+VkSemaphore VulkanDevice::CreateSemaphore() {
+    VkSemaphore semaphore = VK_NULL_HANDLE;
+    VkSemaphoreCreateInfo semaphoreCreateInfo{};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    DebugCheckCriticalVk(
+            vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &semaphore),
+            "Failed to create Vulkan semaphore."
+    );
+    return semaphore;
+}
+
+VkCommandPool VulkanDevice::CreateCommandPool(VkCommandPoolCreateFlags flags) {
+    VkCommandPool commandPool = VK_NULL_HANDLE;
+    VkCommandPoolCreateInfo commandPoolCreateInfo{};
+    commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    commandPoolCreateInfo.flags = flags;
+    commandPoolCreateInfo.queueFamilyIndex = m_graphicsQueueFamilyIndex;
+    DebugCheckCriticalVk(
+            vkCreateCommandPool(m_device, &commandPoolCreateInfo, nullptr, &commandPool),
+            "Failed to create Vulkan command pool."
+    );
+    return commandPool;
+}
+
+VkCommandBuffer VulkanDevice::AllocateCommandBuffer(VkCommandPool commandPool, VkCommandBufferLevel level) {
+    VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+    VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
+    commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    commandBufferAllocateInfo.commandPool = commandPool;
+    commandBufferAllocateInfo.level = level;
+    commandBufferAllocateInfo.commandBufferCount = 1;
+    DebugCheckCriticalVk(
+            vkAllocateCommandBuffers(m_device, &commandBufferAllocateInfo, &commandBuffer),
+            "Failed to allocate Vulkan command buffer."
+    );
+    return commandBuffer;
 }
 
 VkRenderPass VulkanDevice::CreateRenderPass(const VkRenderPassCreateInfo &createInfo) {
@@ -415,5 +481,51 @@ void VulkanDevice::FreeDescriptorSet(VkDescriptorSet descriptorSet) {
     DebugCheckCriticalVk(
             vkFreeDescriptorSets(m_device, m_descriptorPool, 1, &descriptorSet),
             "Failed to free Vulkan descriptor set."
+    );
+}
+
+void VulkanDevice::WaitIdle() {
+    DebugCheckCriticalVk(
+            vkDeviceWaitIdle(m_device),
+            "Failed when waiting for Vulkan device to be idle."
+    );
+}
+
+void VulkanDevice::SubmitToGraphicsQueue(const VkSubmitInfo &submitInfo, VkFence fence) {
+    DebugCheckCriticalVk(
+            vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, fence),
+            "Failed to submit Vulkan command buffer."
+    );
+}
+
+void VulkanDevice::SubmitToGraphicsQueue(VkCommandBuffer commandBuffer, VkFence fence) {
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+    SubmitToGraphicsQueue(submitInfo, fence);
+}
+
+void BeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlags flags) {
+    VkCommandBufferBeginInfo commandBufferBeginInfo{};
+    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    commandBufferBeginInfo.flags = flags;
+    DebugCheckCriticalVk(
+            vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo),
+            "Failed to begin Vulkan command buffer."
+    );
+}
+
+void EndCommandBuffer(VkCommandBuffer commandBuffer) {
+    DebugCheckCriticalVk(
+            vkEndCommandBuffer(commandBuffer),
+            "Failed to end Vulkan command buffer."
+    );
+}
+
+void ResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags) {
+    DebugCheckCriticalVk(
+            vkResetCommandBuffer(commandBuffer, flags),
+            "Failed to reset Vulkan command buffer."
     );
 }
