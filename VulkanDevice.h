@@ -124,6 +124,12 @@ public:
         vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
     }
 
+    VkSampler CreateSampler(const VkSamplerCreateInfo &createInfo);
+
+    void DestroySampler(VkSampler sampler) {
+        vkDestroySampler(m_device, sampler, nullptr);
+    }
+
     void WaitIdle();
 
     void WaitGraphicsQueueIdle();

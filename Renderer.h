@@ -35,7 +35,7 @@ private:
 
     void CreateFramebuffers();
 
-    void CreateDescriptorSetLayout();
+    void CreateDescriptorSetLayouts();
 
     void CreateBufferingObjects();
 
@@ -45,17 +45,20 @@ private:
 
     void CreateTexture();
 
+    void CreateMaterial();
+
     GLFWwindow *m_window = nullptr;
     std::unique_ptr<VulkanBase> m_device;
 
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
     std::vector<VkFramebuffer> m_framebuffers;
 
-    VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout m_engineDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout m_materialDescriptorSetLayout = VK_NULL_HANDLE;
 
     struct BufferingObjects {
-        VulkanBuffer CameraUniformBuffer;
-        VkDescriptorSet DescriptorSet;
+        VulkanBuffer EngineUniformBuffer;
+        VkDescriptorSet EngineDescriptorSet;
     };
     std::vector<BufferingObjects> m_bufferingObjects;
 
@@ -67,10 +70,15 @@ private:
 
     VulkanImage m_image;
     VkImageView m_imageView = VK_NULL_HANDLE;
+    VkSampler m_sampler = VK_NULL_HANDLE;
+
+    VkDescriptorSet m_materialDescriptorSet = VK_NULL_HANDLE;
 
     bool m_showImGui = true;
 
     float m_fps = 0.0f;
+
+    VkClearColorValue m_clearColor{};
 
     float m_rotationSpeed = 0.0f;
     float m_rotation = 0.0f;

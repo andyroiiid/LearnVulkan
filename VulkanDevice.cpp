@@ -484,6 +484,15 @@ void VulkanDevice::FreeDescriptorSet(VkDescriptorSet descriptorSet) {
     );
 }
 
+VkSampler VulkanDevice::CreateSampler(const VkSamplerCreateInfo &createInfo) {
+    VkSampler sampler = VK_NULL_HANDLE;
+    DebugCheckCriticalVk(
+            vkCreateSampler(m_device, &createInfo, nullptr, &sampler),
+            "Failed to create Vulkan sampler."
+    );
+    return sampler;
+}
+
 void VulkanDevice::WaitIdle() {
     DebugCheckCriticalVk(
             vkDeviceWaitIdle(m_device),

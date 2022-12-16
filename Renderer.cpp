@@ -11,7 +11,7 @@
 #include "MeshUtilities.h"
 #include "ImageFile.h"
 
-struct CameraUniformData {
+struct EngineUniformData {
     glm::mat4 Projection;
     glm::mat4 View;
 };
@@ -25,11 +25,12 @@ Renderer::Renderer(GLFWwindow *window) {
     m_device = std::make_unique<VulkanBase>(window, false);
     CreateRenderPass();
     CreateFramebuffers();
-    CreateDescriptorSetLayout();
+    CreateDescriptorSetLayouts();
     CreateBufferingObjects();
     CreatePipeline();
     CreateMesh();
     CreateTexture();
+    CreateMaterial();
     m_device->ImGuiInit(m_renderPass);
 }
 
@@ -105,37 +106,50 @@ void Renderer::CreateFramebuffers() {
     }
 }
 
-void Renderer::CreateDescriptorSetLayout() {
-    VkDescriptorSetLayoutBinding cameraUniformBinding{};
-    cameraUniformBinding.binding = 0;
-    cameraUniformBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    cameraUniformBinding.descriptorCount = 1;
-    cameraUniformBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+void Renderer::CreateDescriptorSetLayouts() {
+    VkDescriptorSetLayoutBinding engineUniformBinding{};
+    engineUniformBinding.binding = 0;
+    engineUniformBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    engineUniformBinding.descriptorCount = 1;
+    engineUniformBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-    VkDescriptorSetLayoutCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    createInfo.bindingCount = 1;
-    createInfo.pBindings = &cameraUniformBinding;
+    VkDescriptorSetLayoutCreateInfo engineDescriptorSetLayoutCreateInfo{};
+    engineDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    engineDescriptorSetLayoutCreateInfo.bindingCount = 1;
+    engineDescriptorSetLayoutCreateInfo.pBindings = &engineUniformBinding;
 
-    m_descriptorSetLayout = m_device->CreateDescriptorSetLayout(createInfo);
+    m_engineDescriptorSetLayout = m_device->CreateDescriptorSetLayout(engineDescriptorSetLayoutCreateInfo);
+
+    VkDescriptorSetLayoutBinding materialTextureBinding{};
+    materialTextureBinding.binding = 0;
+    materialTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    materialTextureBinding.descriptorCount = 1;
+    materialTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutCreateInfo materialDescriptorSetLayoutCreateInfo{};
+    materialDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    materialDescriptorSetLayoutCreateInfo.bindingCount = 1;
+    materialDescriptorSetLayoutCreateInfo.pBindings = &materialTextureBinding;
+
+    m_materialDescriptorSetLayout = m_device->CreateDescriptorSetLayout(materialDescriptorSetLayoutCreateInfo);
 }
 
 void Renderer::CreateBufferingObjects() {
     m_bufferingObjects.resize(m_device->GetNumBuffering());
     for (BufferingObjects &bufferingObjects: m_bufferingObjects) {
-        VulkanBuffer cameraUniformBuffer = m_device->CreateBuffer(
-                sizeof(CameraUniformData),
+        VulkanBuffer engineUniformBuffer = m_device->CreateBuffer(
+                sizeof(EngineUniformData),
                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                 VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
                 VMA_MEMORY_USAGE_AUTO_PREFER_HOST
         );
 
-        VkDescriptorSet descriptorSet = m_device->AllocateDescriptorSet(m_descriptorSetLayout);
+        VkDescriptorSet descriptorSet = m_device->AllocateDescriptorSet(m_engineDescriptorSetLayout);
 
         VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = cameraUniformBuffer.Get();
+        bufferInfo.buffer = engineUniformBuffer.Get();
         bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(CameraUniformData);
+        bufferInfo.range = sizeof(EngineUniformData);
 
         VkWriteDescriptorSet writeDescriptorSet{};
         writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -147,15 +161,18 @@ void Renderer::CreateBufferingObjects() {
 
         m_device->WriteDescriptorSet(writeDescriptorSet);
 
-        bufferingObjects.CameraUniformBuffer = std::move(cameraUniformBuffer);
-        bufferingObjects.DescriptorSet = descriptorSet;
+        bufferingObjects.EngineUniformBuffer = std::move(engineUniformBuffer);
+        bufferingObjects.EngineDescriptorSet = descriptorSet;
     }
 }
 
 void Renderer::CreatePipeline() {
     VulkanPipelineCreateInfo pipelineCreateInfo{};
     pipelineCreateInfo.Device = m_device.get();
-    pipelineCreateInfo.DescriptorSetLayout = m_descriptorSetLayout;
+    pipelineCreateInfo.DescriptorSetLayouts = {
+            m_engineDescriptorSetLayout,
+            m_materialDescriptorSetLayout
+    };
     pipelineCreateInfo.PushConstantSize = sizeof(ModelConstantsData);
     pipelineCreateInfo.ShaderStages = {
             {VK_SHADER_STAGE_VERTEX_BIT,   R"GLSL(
@@ -165,9 +182,10 @@ layout (location = 0) in vec3 aPosition;
 layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec2 aTexCoord;
 
-layout (location = 0) out vec4 vColor;
+layout (location = 0) out vec3 vWorldNormal;
+layout (location = 1) out vec2 vTexCoord;
 
-layout (set = 0, binding = 0) uniform CameraUniformData {
+layout (set = 0, binding = 0) uniform EngineUniformData {
     mat4 uProjection;
     mat4 uView;
 };
@@ -180,19 +198,30 @@ layout (push_constant) uniform ModelConstantsData
 void main()
 {
     gl_Position = uProjection * uView * uModel * vec4(aPosition, 1);
-    vColor = vec4(aTexCoord, 0, 1);
+    vWorldNormal = (uModel * vec4(aNormal, 1)).xyz;
+    vTexCoord = aTexCoord;
 }
 )GLSL"},
             {VK_SHADER_STAGE_FRAGMENT_BIT, R"GLSL(
 #version 450 core
 
-layout (location = 0) in vec4 vColor;
+layout (location = 0) in vec3 vWorldNormal;
+layout (location = 1) in vec2 vTexCoord;
 
 layout (location = 0) out vec4 fColor;
 
+layout (set = 1, binding = 0) uniform sampler2D uTexture;
+
+float LightDiffuse(vec3 worldNormal, vec3 lightDirection) {
+    return max(0, dot(worldNormal, normalize(lightDirection)));
+}
+
 void main()
 {
-    fColor = vColor;
+    vec3 worldNormal = normalize(vWorldNormal);
+    vec4 color = texture(uTexture, vTexCoord);
+    color.rgb *= LightDiffuse(worldNormal, vec3(1, 2, -3));
+    fColor = color;
 }
 )GLSL"}
     };
@@ -306,6 +335,34 @@ void Renderer::CreateTexture() {
     depthImageViewSubresourceRange.baseArrayLayer = 0;
     depthImageViewSubresourceRange.layerCount = 1;
     m_imageView = m_device->CreateImageView(imageViewCreateInfo);
+
+    VkSamplerCreateInfo samplerCreateInfo{};
+    samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+    samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+    samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    m_sampler = m_device->CreateSampler(samplerCreateInfo);
+}
+
+void Renderer::CreateMaterial() {
+    m_materialDescriptorSet = m_device->AllocateDescriptorSet(m_materialDescriptorSetLayout);
+
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.sampler = m_sampler;
+    imageInfo.imageView = m_imageView;
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkWriteDescriptorSet writeDescriptorSet{};
+    writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeDescriptorSet.dstSet = m_materialDescriptorSet;
+    writeDescriptorSet.dstBinding = 0;
+    writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writeDescriptorSet.descriptorCount = 1;
+    writeDescriptorSet.pImageInfo = &imageInfo;
+
+    m_device->WriteDescriptorSet(writeDescriptorSet);
 }
 
 Renderer::~Renderer() {
@@ -313,6 +370,9 @@ Renderer::~Renderer() {
 
     m_device->ImGuiShutdown();
 
+    m_device->FreeDescriptorSet(m_materialDescriptorSet);
+
+    m_device->DestroySampler(m_sampler);
     m_device->DestroyImageView(m_imageView);
     m_image = {};
 
@@ -322,11 +382,12 @@ Renderer::~Renderer() {
     m_wirePipeline = {};
 
     for (BufferingObjects &bufferingObjects: m_bufferingObjects) {
-        bufferingObjects.CameraUniformBuffer = {};
-        m_device->FreeDescriptorSet(bufferingObjects.DescriptorSet);
+        bufferingObjects.EngineUniformBuffer = {};
+        m_device->FreeDescriptorSet(bufferingObjects.EngineDescriptorSet);
     }
 
-    m_device->DestroyDescriptorSetLayout(m_descriptorSetLayout);
+    m_device->DestroyDescriptorSetLayout(m_engineDescriptorSetLayout);
+    m_device->DestroyDescriptorSetLayout(m_materialDescriptorSetLayout);
     for (auto &framebuffer: m_framebuffers) {
         m_device->DestroyFramebuffer(framebuffer);
     }
@@ -354,15 +415,11 @@ void Renderer::Frame(float deltaTime) {
             glm::vec3(0.0f, 0.0f, 0.0f),
             glm::vec3(0.0f, 1.0f, 0.0f)
     );
-    CameraUniformData cameraUniformData{projection, view};
-    bufferingObjects.CameraUniformBuffer.Upload(sizeof(CameraUniformData), &cameraUniformData);
+    EngineUniformData engineUniformData{projection, view};
+    bufferingObjects.EngineUniformBuffer.Upload(sizeof(EngineUniformData), &engineUniformData);
 
     VkClearValue clearValues[2];
-    VkClearColorValue &clearColor = clearValues[0].color;
-    clearColor.float32[0] = 0.4f;
-    clearColor.float32[1] = 0.8f;
-    clearColor.float32[2] = 1.0f;
-    clearColor.float32[3] = 1.0f;
+    clearValues[0].color = m_clearColor;
     VkClearDepthStencilValue &clearDepthStencil = clearValues[1].depthStencil;
     clearDepthStencil.depth = 1.0f;
     clearDepthStencil.stencil = 0;
@@ -377,7 +434,8 @@ void Renderer::Frame(float deltaTime) {
 
     VulkanPipeline &pipeline = m_fill ? m_fillPipeline : m_wirePipeline;
     pipeline.Bind(cmd);
-    pipeline.BindDescriptorSet(cmd, bufferingObjects.DescriptorSet);
+    pipeline.BindDescriptorSet(cmd, bufferingObjects.EngineDescriptorSet, 0);
+    pipeline.BindDescriptorSet(cmd, m_materialDescriptorSet, 1);
     const glm::mat4 model = glm::rotate(glm::mat4(1.0f), m_rotation, glm::vec3(0.0f, 1.0f, 0.0f));
     const ModelConstantsData constantsData{model};
     pipeline.PushConstants(cmd, constantsData);
@@ -389,7 +447,9 @@ void Renderer::Frame(float deltaTime) {
             ImGui::Text("fps = %f", m_fps);
         }
         ImGui::EndMainMenuBar();
-        ImGui::Checkbox("Set Filled", &m_fill);
+
+        ImGui::ColorEdit4("Clear Color", m_clearColor.float32);
+        ImGui::Checkbox("Cube Filled", &m_fill);
         m_device->ImGuiRender(cmd);
     }
 
