@@ -58,8 +58,8 @@ private:
     std::vector<BufferingObjects> m_bufferingObjects;
 
     bool m_fill = true;
-    std::unique_ptr<VulkanPipeline> m_fillPipeline;
-    std::unique_ptr<VulkanPipeline> m_wirePipeline;
+    VulkanPipeline m_fillPipeline;
+    VulkanPipeline m_wirePipeline;
 
     VulkanMesh m_mesh;
 

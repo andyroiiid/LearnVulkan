@@ -31,17 +31,33 @@ struct VulkanPipelineCreateInfo {
 
 class VulkanPipeline {
 public:
+    VulkanPipeline() = default;
+
     explicit VulkanPipeline(const VulkanPipelineCreateInfo &createInfo);
 
-    ~VulkanPipeline();
+    ~VulkanPipeline() {
+        Release();
+    }
 
     VulkanPipeline(const VulkanPipeline &) = delete;
 
     VulkanPipeline &operator=(const VulkanPipeline &) = delete;
 
-    VulkanPipeline(VulkanPipeline &&) = delete;
+    VulkanPipeline(VulkanPipeline &&other) noexcept {
+        Swap(other);
+    }
 
-    VulkanPipeline &operator=(VulkanPipeline &&) = delete;
+    VulkanPipeline &operator=(VulkanPipeline &&other) noexcept {
+        if (this != &other) {
+            Release();
+            Swap(other);
+        }
+        return *this;
+    }
+
+    void Release();
+
+    void Swap(VulkanPipeline &other) noexcept;
 
     void Bind(VkCommandBuffer commandBuffer) {
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);

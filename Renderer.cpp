@@ -196,11 +196,11 @@ void main()
     pipelineCreateInfo.VertexInput = &VertexBase::GetPipelineVertexInputStateCreateInfo();
     pipelineCreateInfo.RenderPass = m_renderPass;
 
-    m_fillPipeline = std::make_unique<VulkanPipeline>(pipelineCreateInfo);
+    m_fillPipeline = VulkanPipeline(pipelineCreateInfo);
 
     pipelineCreateInfo.PolygonMode = VK_POLYGON_MODE_LINE;
     pipelineCreateInfo.CullMode = VK_CULL_MODE_NONE;
-    m_wirePipeline = std::make_unique<VulkanPipeline>(pipelineCreateInfo);
+    m_wirePipeline = VulkanPipeline(pipelineCreateInfo);
 }
 
 void Renderer::CreateMesh() {
@@ -214,8 +214,8 @@ Renderer::~Renderer() {
 
     m_mesh = {};
 
-    m_fillPipeline.reset();
-    m_wirePipeline.reset();
+    m_fillPipeline = {};
+    m_wirePipeline = {};
 
     for (BufferingObjects &bufferingObjects: m_bufferingObjects) {
         bufferingObjects.CameraUniformBuffer = {};
@@ -270,12 +270,12 @@ void Renderer::Frame(float deltaTime) {
     renderPassBeginInfo.pClearValues = clearValues;
     vkCmdBeginRenderPass(cmd, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    VulkanPipeline *pipeline = m_fill ? m_fillPipeline.get() : m_wirePipeline.get();
-    pipeline->Bind(cmd);
-    pipeline->BindDescriptorSet(cmd, bufferingObjects.DescriptorSet);
+    VulkanPipeline &pipeline = m_fill ? m_fillPipeline : m_wirePipeline;
+    pipeline.Bind(cmd);
+    pipeline.BindDescriptorSet(cmd, bufferingObjects.DescriptorSet);
     const glm::mat4 model = glm::rotate(glm::mat4(1.0f), m_rotation, glm::vec3(0.0f, 1.0f, 0.0f));
     const ModelConstantsData constantsData{model};
-    pipeline->PushConstants(cmd, constantsData);
+    pipeline.PushConstants(cmd, constantsData);
     m_mesh.BindAndDraw(cmd);
 
     vkCmdEndRenderPass(cmd);

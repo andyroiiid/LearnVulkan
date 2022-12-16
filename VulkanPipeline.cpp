@@ -157,10 +157,24 @@ void VulkanPipeline::CreatePipeline(const VulkanPipelineCreateInfo &createInfo) 
     m_pipeline = m_device->CreateGraphicsPipeline(pipelineCreateInfo);
 }
 
-VulkanPipeline::~VulkanPipeline() {
-    m_device->DestroyPipeline(m_pipeline);
-    for (ShaderStage &shaderStage: m_shaderStages) {
-        m_device->DestroyShaderModule(shaderStage.Module);
+void VulkanPipeline::Release() {
+    if (m_device) {
+        m_device->DestroyPipeline(m_pipeline);
+        for (ShaderStage &shaderStage: m_shaderStages) {
+            m_device->DestroyShaderModule(shaderStage.Module);
+        }
+        m_device->DestroyPipelineLayout(m_pipelineLayout);
     }
-    m_device->DestroyPipelineLayout(m_pipelineLayout);
+
+    m_device = nullptr;
+    m_pipelineLayout = VK_NULL_HANDLE;
+    m_shaderStages.clear();
+    m_pipeline = VK_NULL_HANDLE;
+}
+
+void VulkanPipeline::Swap(VulkanPipeline &other) noexcept {
+    std::swap(m_device, other.m_device);
+    std::swap(m_pipelineLayout, other.m_pipelineLayout);
+    std::swap(m_shaderStages, other.m_shaderStages);
+    std::swap(m_pipeline, other.m_pipeline);
 }
