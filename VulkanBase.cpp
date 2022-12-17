@@ -21,7 +21,7 @@ VulkanBase::VulkanBase(GLFWwindow *window, bool vsync, size_t numBuffering)
 }
 
 void VulkanBase::CreateImmediateContext() {
-    m_immediateFence = CreateFence(VK_FENCE_CREATE_SIGNALED_BIT);
+    m_immediateFence = CreateFence();
     m_immediateCommandPool = CreateCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     m_immediateCommandBuffer = AllocateCommandBuffer(m_immediateCommandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 }

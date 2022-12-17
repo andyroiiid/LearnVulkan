@@ -50,16 +50,14 @@ public:
 
     template<class Func>
     void ImmediateSubmit(Func &&func) {
-        WaitForFence(m_immediateFence);
-        ResetFence(m_immediateFence);
-
         ResetCommandBuffer(m_immediateCommandBuffer);
         BeginCommandBuffer(m_immediateCommandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
         func(m_immediateCommandBuffer);
         EndCommandBuffer(m_immediateCommandBuffer);
 
         SubmitToGraphicsQueue(m_immediateCommandBuffer, m_immediateFence);
-        WaitGraphicsQueueIdle();
+        WaitForFence(m_immediateFence);
+        ResetFence(m_immediateFence);
     }
 
 private:
