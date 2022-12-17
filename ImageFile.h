@@ -40,8 +40,6 @@ public:
 
     [[nodiscard]] uint32_t GetHeight() const { return m_height; }
 
-    [[nodiscard]] uint32_t GetDataSize() const { return m_width * m_height * 4; }
-
     [[nodiscard]] const unsigned char *GetData() const { return m_data; }
 
 private:

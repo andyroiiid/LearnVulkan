@@ -9,6 +9,7 @@
 #include "VulkanBase.h"
 #include "VulkanPipeline.h"
 #include "VulkanMesh.h"
+#include "VulkanTexture.h"
 
 class Renderer {
 public:
@@ -68,9 +69,7 @@ private:
 
     VulkanMesh m_mesh;
 
-    VulkanImage m_image;
-    VkImageView m_imageView = VK_NULL_HANDLE;
-    VkSampler m_sampler = VK_NULL_HANDLE;
+    VulkanTexture m_texture;
 
     VkDescriptorSet m_materialDescriptorSet = VK_NULL_HANDLE;
 
