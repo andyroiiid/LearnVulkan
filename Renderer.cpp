@@ -23,43 +23,13 @@ struct ModelConstantsData {
 Renderer::Renderer(GLFWwindow *window) {
     m_window = window;
     m_device = std::make_unique<VulkanBase>(window, false);
-    CreateRenderPass();
-    CreateFramebuffers();
     CreateDescriptorSetLayouts();
     CreateBufferingObjects();
     CreatePipeline();
     CreateMesh();
     CreateTexture();
     CreateMaterial();
-    m_device->ImGuiInit(m_renderPass.Get());
-}
-
-void Renderer::CreateRenderPass() {
-    m_renderPass = VulkanRenderPass{
-            m_device.get(),
-            {m_device->GetSurfaceFormat().format},
-            m_device->GetDepthStencilFormat(),
-            true
-    };
-}
-
-void Renderer::CreateFramebuffers() {
-    const std::vector<VkImageView> &swapchainImageViews = m_device->GetSwapchainImageViews();
-    const std::vector<VkImageView> &depthStencilImageViews = m_device->GetDepthStencilImageViews();
-    const VkExtent2D &swapchainExtent = m_device->GetSwapchainExtent();
-    size_t numImages = swapchainImageViews.size();
-    m_framebuffers.reserve(numImages);
-    for (int i = 0; i < numImages; i++) {
-        VulkanFramebuffer framebuffer = m_renderPass.CreateFrameBuffer(
-                {
-                        swapchainImageViews[i],
-                        depthStencilImageViews[i]
-                },
-                swapchainExtent.width,
-                swapchainExtent.height
-        );
-        m_framebuffers.push_back(std::move(framebuffer));
-    }
+    m_device->ImGuiInit();
 }
 
 void Renderer::CreateDescriptorSetLayouts() {
@@ -170,7 +140,7 @@ void main()
 )GLSL"}
     };
     pipelineCreateInfo.VertexInput = &VertexBase::GetPipelineVertexInputStateCreateInfo();
-    pipelineCreateInfo.RenderPass = m_renderPass.Get();
+    pipelineCreateInfo.RenderPass = m_device->GetPrimaryRenderPass();
 
     m_fillPipeline = VulkanPipeline(pipelineCreateInfo);
 
@@ -217,10 +187,6 @@ Renderer::~Renderer() {
     m_engineDescriptorSetLayout = {};
     m_materialDescriptorSetLayout = {};
 
-    m_framebuffers.clear();
-
-    m_renderPass = {};
-
     m_device.reset();
 }
 
@@ -228,7 +194,7 @@ void Renderer::Frame(float deltaTime) {
     m_fps = 1.0f / deltaTime;
     m_rotation += glm::radians(deltaTime * m_rotationSpeed);
 
-    auto [swapchainImageIndex, bufferingIndex, cmd] = m_device->BeginFrame();
+    auto [screenFramebuffer, bufferingIndex, cmd] = m_device->BeginFrame();
 
     BufferingObjects &bufferingObjects = m_bufferingObjects[bufferingIndex];
     const VkExtent2D &swapchainExtent = m_device->GetSwapchainExtent();
@@ -253,8 +219,8 @@ void Renderer::Frame(float deltaTime) {
     clearDepthStencil.stencil = 0;
     VkRenderPassBeginInfo renderPassBeginInfo{};
     renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassBeginInfo.renderPass = m_renderPass.Get();
-    renderPassBeginInfo.framebuffer = m_framebuffers[swapchainImageIndex].Get();
+    renderPassBeginInfo.renderPass = m_device->GetPrimaryRenderPass();
+    renderPassBeginInfo.framebuffer = screenFramebuffer;
     renderPassBeginInfo.renderArea = {{0, 0}, m_device->GetSwapchainExtent()};
     renderPassBeginInfo.clearValueCount = 2;
     renderPassBeginInfo.pClearValues = clearValues;

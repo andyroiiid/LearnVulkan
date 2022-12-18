@@ -5,6 +5,8 @@
 #pragma once
 
 #include "VulkanDevice.h"
+#include "VulkanRenderPass.h"
+#include "VulkanFramebuffer.h"
 
 class VulkanBase : public VulkanDevice {
 public:
@@ -22,15 +24,11 @@ public:
 
     [[nodiscard]] const VkExtent2D &GetSwapchainExtent() const { return m_swapchainExtent; }
 
-    [[nodiscard]] const std::vector<VkImageView> &GetSwapchainImageViews() const { return m_swapchainImageViews; }
-
-    [[nodiscard]] const VkFormat &GetDepthStencilFormat() const { return m_depthStencilFormat; }
-
-    [[nodiscard]] const std::vector<VkImageView> &GetDepthStencilImageViews() const { return m_depthStencilImageViews; }
+    [[nodiscard]] const VkRenderPass &GetPrimaryRenderPass() const { return m_primaryRenderPass.Get(); }
 
     [[nodiscard]] size_t GetNumBuffering() const { return m_bufferingObjects.size(); }
 
-    void ImGuiInit(VkRenderPass renderPass);
+    void ImGuiInit();
 
     void ImGuiShutdown();
 
@@ -39,7 +37,7 @@ public:
     void ImGuiRender(VkCommandBuffer commandBuffer);
 
     struct BeginFrameInfo {
-        [[maybe_unused]] uint32_t SwapchainImageIndex;
+        [[maybe_unused]] VkFramebuffer ScreenFramebuffer;
         [[maybe_unused]] uint32_t BufferingIndex;
         [[maybe_unused]] VkCommandBuffer CommandBuffer;
     };
@@ -69,6 +67,8 @@ private:
 
     void CreateDepthStencilImageAndViews();
 
+    void CreatePrimaryRenderPassAndFramebuffers();
+
     void CreateBufferingObjects(size_t numBuffering);
 
     VkFence m_immediateFence = VK_NULL_HANDLE;
@@ -83,6 +83,9 @@ private:
     VkFormat m_depthStencilFormat = VK_FORMAT_D32_SFLOAT;
     std::vector<VulkanImage> m_depthStencilImages;
     std::vector<VkImageView> m_depthStencilImageViews;
+
+    VulkanRenderPass m_primaryRenderPass = {};
+    std::vector<VulkanFramebuffer> m_primaryFramebuffers;
 
     struct BufferingObjects {
         VkFence RenderFence = VK_NULL_HANDLE;

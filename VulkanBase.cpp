@@ -17,6 +17,7 @@ VulkanBase::VulkanBase(GLFWwindow *window, bool vsync, size_t numBuffering)
     CreateSwapchain(vsync);
     CreateSwapchainImageViews();
     CreateDepthStencilImageAndViews();
+    CreatePrimaryRenderPassAndFramebuffers();
     CreateBufferingObjects(numBuffering);
 }
 
@@ -136,6 +137,31 @@ void VulkanBase::CreateDepthStencilImageAndViews() {
     }
 }
 
+void VulkanBase::CreatePrimaryRenderPassAndFramebuffers() {
+    m_primaryRenderPass = VulkanRenderPass{
+            this,
+            {m_surfaceFormat.format},
+            m_depthStencilFormat,
+            true
+    };
+
+    size_t numImages = m_swapchainImages.size();
+    m_primaryFramebuffers.reserve(numImages);
+    for (int i = 0; i < numImages; i++) {
+        VulkanFramebuffer framebuffer = VulkanFramebuffer(
+                this,
+                m_primaryRenderPass.Get(),
+                {
+                        m_swapchainImageViews[i],
+                        m_depthStencilImageViews[i]
+                },
+                m_swapchainExtent.width,
+                m_swapchainExtent.height
+        );
+        m_primaryFramebuffers.push_back(std::move(framebuffer));
+    }
+}
+
 void VulkanBase::CreateBufferingObjects(size_t numBuffering) {
     m_bufferingObjects.resize(numBuffering);
     for (BufferingObjects &bufferingObjects: m_bufferingObjects) {
@@ -160,6 +186,8 @@ VulkanBase::~VulkanBase() {
         DestroyFence(bufferingObjects.RenderFence);
     }
 
+    m_primaryFramebuffers.clear();
+    m_primaryRenderPass = {};
     for (auto &depthStencilImageView: m_depthStencilImageViews) {
         DestroyImageView(depthStencilImageView);
     }
@@ -176,7 +204,7 @@ VulkanBase::~VulkanBase() {
     DestroyFence(m_immediateFence);
 }
 
-void VulkanBase::ImGuiInit(VkRenderPass renderPass) {
+void VulkanBase::ImGuiInit() {
     ImGui::CreateContext();
     ImGui::GetIO().IniFilename = nullptr;
 
@@ -195,7 +223,7 @@ void VulkanBase::ImGuiInit(VkRenderPass renderPass) {
     initInfo.CheckVkResultFn = [](VkResult result) {
         DebugCheckVk(result, "Vulkan error in ImGui: {}", result);
     };
-    ImGui_ImplVulkan_Init(&initInfo, renderPass);
+    ImGui_ImplVulkan_Init(&initInfo, m_primaryRenderPass.Get());
 
     ImmediateSubmit([](VkCommandBuffer cmd) {
         ImGui_ImplVulkan_CreateFontsTexture(cmd);
@@ -243,7 +271,11 @@ VulkanBase::BeginFrameInfo VulkanBase::BeginFrame() {
     ResetCommandBuffer(bufferingObjects.CommandBuffer);
     BeginCommandBuffer(bufferingObjects.CommandBuffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    return {m_currentSwapchainImageIndex, m_currentBufferingIndex, bufferingObjects.CommandBuffer};
+    return {
+            m_primaryFramebuffers[m_currentSwapchainImageIndex].Get(),
+            m_currentBufferingIndex,
+            bufferingObjects.CommandBuffer
+    };
 }
 
 void VulkanBase::EndFrame() {

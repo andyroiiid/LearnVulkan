@@ -35,10 +35,6 @@ public:
     void OnKeyUp(int key);
 
 private:
-    void CreateRenderPass();
-
-    void CreateFramebuffers();
-
     void CreateDescriptorSetLayouts();
 
     void CreateBufferingObjects();
@@ -53,9 +49,6 @@ private:
 
     GLFWwindow *m_window = nullptr;
     std::unique_ptr<VulkanBase> m_device;
-
-    VulkanRenderPass m_renderPass = {};
-    std::vector<VulkanFramebuffer> m_framebuffers;
 
     VulkanDescriptorSetLayout m_engineDescriptorSetLayout;
     VulkanDescriptorSetLayout m_materialDescriptorSetLayout;
