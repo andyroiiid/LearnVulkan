@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "VulkanBase.h"
+#include "VulkanRenderPass.h"
 #include "VulkanPipeline.h"
 #include "VulkanMesh.h"
 #include "VulkanTexture.h"
@@ -51,7 +52,7 @@ private:
     GLFWwindow *m_window = nullptr;
     std::unique_ptr<VulkanBase> m_device;
 
-    VkRenderPass m_renderPass = VK_NULL_HANDLE;
+    VulkanRenderPass m_renderPass = {};
     std::vector<VkFramebuffer> m_framebuffers;
 
     VkDescriptorSetLayout m_engineDescriptorSetLayout = VK_NULL_HANDLE;

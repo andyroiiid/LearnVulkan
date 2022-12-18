@@ -31,56 +31,16 @@ Renderer::Renderer(GLFWwindow *window) {
     CreateMesh();
     CreateTexture();
     CreateMaterial();
-    m_device->ImGuiInit(m_renderPass);
+    m_device->ImGuiInit(m_renderPass.Get());
 }
 
 void Renderer::CreateRenderPass() {
-    VkAttachmentDescription attachments[2];
-
-    VkAttachmentDescription &colorAttachment = attachments[0];
-    colorAttachment.flags = 0;
-    colorAttachment.format = m_device->GetSurfaceFormat().format;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentDescription &depthStencilAttachment = attachments[1];
-    depthStencilAttachment.flags = 0;
-    depthStencilAttachment.format = m_device->GetDepthStencilFormat();
-    depthStencilAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthStencilAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthStencilAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthStencilAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthStencilAttachmentRef{};
-    depthStencilAttachmentRef.attachment = 1;
-    depthStencilAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-    subpass.pDepthStencilAttachment = &depthStencilAttachmentRef;
-
-    VkRenderPassCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    createInfo.attachmentCount = 2;
-    createInfo.pAttachments = attachments;
-    createInfo.subpassCount = 1;
-    createInfo.pSubpasses = &subpass;
-
-    m_renderPass = m_device->CreateRenderPass(createInfo);
+    m_renderPass = VulkanRenderPass{
+            m_device.get(),
+            {m_device->GetSurfaceFormat().format},
+            m_device->GetDepthStencilFormat(),
+            true
+    };
 }
 
 void Renderer::CreateFramebuffers() {
@@ -92,7 +52,7 @@ void Renderer::CreateFramebuffers() {
     for (int i = 0; i < numImages; i++) {
         VkFramebufferCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        createInfo.renderPass = m_renderPass;
+        createInfo.renderPass = m_renderPass.Get();
         VkImageView attachments[2]{
                 swapchainImageViews[i],
                 depthStencilImageViews[i]
@@ -226,7 +186,7 @@ void main()
 )GLSL"}
     };
     pipelineCreateInfo.VertexInput = &VertexBase::GetPipelineVertexInputStateCreateInfo();
-    pipelineCreateInfo.RenderPass = m_renderPass;
+    pipelineCreateInfo.RenderPass = m_renderPass.Get();
 
     m_fillPipeline = VulkanPipeline(pipelineCreateInfo);
 
@@ -275,7 +235,7 @@ Renderer::~Renderer() {
     for (auto &framebuffer: m_framebuffers) {
         m_device->DestroyFramebuffer(framebuffer);
     }
-    m_device->DestroyRenderPass(m_renderPass);
+    m_renderPass = {};
 
     m_device.reset();
 }
@@ -309,7 +269,7 @@ void Renderer::Frame(float deltaTime) {
     clearDepthStencil.stencil = 0;
     VkRenderPassBeginInfo renderPassBeginInfo{};
     renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassBeginInfo.renderPass = m_renderPass;
+    renderPassBeginInfo.renderPass = m_renderPass.Get();
     renderPassBeginInfo.framebuffer = m_framebuffers[swapchainImageIndex];
     renderPassBeginInfo.renderArea = {{0, 0}, m_device->GetSwapchainExtent()};
     renderPassBeginInfo.clearValueCount = 2;

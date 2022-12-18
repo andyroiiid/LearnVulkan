@@ -36,6 +36,7 @@ add_executable(LearnVulkan
         vk_mem_alloc.cpp
         VulkanBuffer.cpp VulkanBuffer.h
         VulkanImage.cpp VulkanImage.h
+        VulkanRenderPass.cpp VulkanRenderPass.h
         VulkanDevice.cpp VulkanDevice.h
         VulkanBase.cpp VulkanBase.h
         VulkanMesh.cpp VulkanMesh.h
