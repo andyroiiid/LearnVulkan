@@ -34,11 +34,12 @@ add_executable(LearnVulkan
         ImageFile.cpp ImageFile.h
         Window.cpp Window.h
         vk_mem_alloc.cpp
+        VulkanDevice.cpp VulkanDevice.h
+        VulkanBase.cpp VulkanBase.h
         VulkanBuffer.cpp VulkanBuffer.h
         VulkanImage.cpp VulkanImage.h
         VulkanRenderPass.cpp VulkanRenderPass.h
-        VulkanDevice.cpp VulkanDevice.h
-        VulkanBase.cpp VulkanBase.h
+        VulkanDescriptorSetLayout.cpp VulkanDescriptorSetLayout.h
         VulkanMesh.cpp VulkanMesh.h
         VulkanTexture.cpp VulkanTexture.h
         ShaderCompiler.cpp ShaderCompiler.h

@@ -67,31 +67,19 @@ void Renderer::CreateFramebuffers() {
 }
 
 void Renderer::CreateDescriptorSetLayouts() {
-    VkDescriptorSetLayoutBinding engineUniformBinding{};
-    engineUniformBinding.binding = 0;
-    engineUniformBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    engineUniformBinding.descriptorCount = 1;
-    engineUniformBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    m_engineDescriptorSetLayout = VulkanDescriptorSetLayout(
+            m_device.get(),
+            {
+                    {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT}
+            }
+    );
 
-    VkDescriptorSetLayoutCreateInfo engineDescriptorSetLayoutCreateInfo{};
-    engineDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    engineDescriptorSetLayoutCreateInfo.bindingCount = 1;
-    engineDescriptorSetLayoutCreateInfo.pBindings = &engineUniformBinding;
-
-    m_engineDescriptorSetLayout = m_device->CreateDescriptorSetLayout(engineDescriptorSetLayoutCreateInfo);
-
-    VkDescriptorSetLayoutBinding materialTextureBinding{};
-    materialTextureBinding.binding = 0;
-    materialTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    materialTextureBinding.descriptorCount = 1;
-    materialTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-    VkDescriptorSetLayoutCreateInfo materialDescriptorSetLayoutCreateInfo{};
-    materialDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    materialDescriptorSetLayoutCreateInfo.bindingCount = 1;
-    materialDescriptorSetLayoutCreateInfo.pBindings = &materialTextureBinding;
-
-    m_materialDescriptorSetLayout = m_device->CreateDescriptorSetLayout(materialDescriptorSetLayoutCreateInfo);
+    m_materialDescriptorSetLayout = VulkanDescriptorSetLayout(
+            m_device.get(),
+            {
+                    {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT}
+            }
+    );
 }
 
 void Renderer::CreateBufferingObjects() {
@@ -104,7 +92,7 @@ void Renderer::CreateBufferingObjects() {
                 VMA_MEMORY_USAGE_AUTO_PREFER_HOST
         );
 
-        VkDescriptorSet descriptorSet = m_device->AllocateDescriptorSet(m_engineDescriptorSetLayout);
+        VkDescriptorSet descriptorSet = m_engineDescriptorSetLayout.AllocateDescriptorSet();
 
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = engineUniformBuffer.Get();
@@ -130,8 +118,8 @@ void Renderer::CreatePipeline() {
     VulkanPipelineCreateInfo pipelineCreateInfo{};
     pipelineCreateInfo.Device = m_device.get();
     pipelineCreateInfo.DescriptorSetLayouts = {
-            m_engineDescriptorSetLayout,
-            m_materialDescriptorSetLayout
+            m_engineDescriptorSetLayout.Get(),
+            m_materialDescriptorSetLayout.Get()
     };
     pipelineCreateInfo.PushConstantSize = sizeof(ModelConstantsData);
     pipelineCreateInfo.ShaderStages = {
@@ -207,7 +195,7 @@ void Renderer::CreateTexture() {
 }
 
 void Renderer::CreateMaterial() {
-    m_materialDescriptorSet = m_device->AllocateDescriptorSet(m_materialDescriptorSetLayout);
+    m_materialDescriptorSet = m_materialDescriptorSetLayout.AllocateDescriptorSet();
     m_texture.BindToDescriptorSet(m_materialDescriptorSet, 0);
 }
 
@@ -230,11 +218,13 @@ Renderer::~Renderer() {
         m_device->FreeDescriptorSet(bufferingObjects.EngineDescriptorSet);
     }
 
-    m_device->DestroyDescriptorSetLayout(m_engineDescriptorSetLayout);
-    m_device->DestroyDescriptorSetLayout(m_materialDescriptorSetLayout);
+    m_engineDescriptorSetLayout = {};
+    m_materialDescriptorSetLayout = {};
+
     for (auto &framebuffer: m_framebuffers) {
         m_device->DestroyFramebuffer(framebuffer);
     }
+
     m_renderPass = {};
 
     m_device.reset();

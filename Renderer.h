@@ -8,6 +8,7 @@
 
 #include "VulkanBase.h"
 #include "VulkanRenderPass.h"
+#include "VulkanDescriptorSetLayout.h"
 #include "VulkanPipeline.h"
 #include "VulkanMesh.h"
 #include "VulkanTexture.h"
@@ -55,8 +56,8 @@ private:
     VulkanRenderPass m_renderPass = {};
     std::vector<VkFramebuffer> m_framebuffers;
 
-    VkDescriptorSetLayout m_engineDescriptorSetLayout = VK_NULL_HANDLE;
-    VkDescriptorSetLayout m_materialDescriptorSetLayout = VK_NULL_HANDLE;
+    VulkanDescriptorSetLayout m_engineDescriptorSetLayout;
+    VulkanDescriptorSetLayout m_materialDescriptorSetLayout;
 
     struct BufferingObjects {
         VulkanBuffer EngineUniformBuffer;
