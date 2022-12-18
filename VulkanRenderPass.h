@@ -5,6 +5,7 @@
 #pragma once
 
 #include "VulkanDevice.h"
+#include "VulkanFramebuffer.h"
 
 class VulkanRenderPass {
 public:
@@ -42,6 +43,10 @@ public:
     void Swap(VulkanRenderPass &other) noexcept;
 
     [[nodiscard]] const VkRenderPass &Get() const { return m_renderPass; }
+
+    VulkanFramebuffer CreateFrameBuffer(const std::initializer_list<VkImageView> &attachments, uint32_t width, uint32_t height) {
+        return {m_device, m_renderPass, attachments, width, height};
+    }
 
 private:
     VulkanDevice *m_device = nullptr;

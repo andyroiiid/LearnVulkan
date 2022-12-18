@@ -8,6 +8,7 @@
 
 #include "VulkanBase.h"
 #include "VulkanRenderPass.h"
+#include "VulkanFramebuffer.h"
 #include "VulkanDescriptorSetLayout.h"
 #include "VulkanPipeline.h"
 #include "VulkanMesh.h"
@@ -54,7 +55,7 @@ private:
     std::unique_ptr<VulkanBase> m_device;
 
     VulkanRenderPass m_renderPass = {};
-    std::vector<VkFramebuffer> m_framebuffers;
+    std::vector<VulkanFramebuffer> m_framebuffers;
 
     VulkanDescriptorSetLayout m_engineDescriptorSetLayout;
     VulkanDescriptorSetLayout m_materialDescriptorSetLayout;

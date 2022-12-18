@@ -48,21 +48,17 @@ void Renderer::CreateFramebuffers() {
     const std::vector<VkImageView> &depthStencilImageViews = m_device->GetDepthStencilImageViews();
     const VkExtent2D &swapchainExtent = m_device->GetSwapchainExtent();
     size_t numImages = swapchainImageViews.size();
-    m_framebuffers.resize(numImages);
+    m_framebuffers.reserve(numImages);
     for (int i = 0; i < numImages; i++) {
-        VkFramebufferCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        createInfo.renderPass = m_renderPass.Get();
-        VkImageView attachments[2]{
-                swapchainImageViews[i],
-                depthStencilImageViews[i]
-        };
-        createInfo.attachmentCount = 2;
-        createInfo.pAttachments = attachments;
-        createInfo.width = swapchainExtent.width;
-        createInfo.height = swapchainExtent.height;
-        createInfo.layers = 1;
-        m_framebuffers[i] = m_device->CreateFramebuffer(createInfo);
+        VulkanFramebuffer framebuffer = m_renderPass.CreateFrameBuffer(
+                {
+                        swapchainImageViews[i],
+                        depthStencilImageViews[i]
+                },
+                swapchainExtent.width,
+                swapchainExtent.height
+        );
+        m_framebuffers.push_back(std::move(framebuffer));
     }
 }
 
@@ -221,9 +217,7 @@ Renderer::~Renderer() {
     m_engineDescriptorSetLayout = {};
     m_materialDescriptorSetLayout = {};
 
-    for (auto &framebuffer: m_framebuffers) {
-        m_device->DestroyFramebuffer(framebuffer);
-    }
+    m_framebuffers.clear();
 
     m_renderPass = {};
 
@@ -260,7 +254,7 @@ void Renderer::Frame(float deltaTime) {
     VkRenderPassBeginInfo renderPassBeginInfo{};
     renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassBeginInfo.renderPass = m_renderPass.Get();
-    renderPassBeginInfo.framebuffer = m_framebuffers[swapchainImageIndex];
+    renderPassBeginInfo.framebuffer = m_framebuffers[swapchainImageIndex].Get();
     renderPassBeginInfo.renderArea = {{0, 0}, m_device->GetSwapchainExtent()};
     renderPassBeginInfo.clearValueCount = 2;
     renderPassBeginInfo.pClearValues = clearValues;

@@ -39,6 +39,7 @@ add_executable(LearnVulkan
         VulkanBuffer.cpp VulkanBuffer.h
         VulkanImage.cpp VulkanImage.h
         VulkanRenderPass.cpp VulkanRenderPass.h
+        VulkanFramebuffer.cpp VulkanFramebuffer.h
         VulkanDescriptorSetLayout.cpp VulkanDescriptorSetLayout.h
         VulkanMesh.cpp VulkanMesh.h
         VulkanTexture.cpp VulkanTexture.h
